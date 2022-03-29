@@ -34,6 +34,8 @@ class _MyHomePageState extends State<MyHomePage> {
   String message = '';
   TextEditingController textEditingController = TextEditingController();
 
+  bool isBottomSheet = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,12 +64,17 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: () async {
                 await methodChannelImpl.pair(
                     textEditingController.text, () {}, () {});
-                await methodChannelImpl.delegate();
+                methodChannelImpl.delegate();
                 print("woyy");
-                methodChannelImpl.streamDelegate().listen((event) {
-                  print('wkwk' + event.toString());
+                methodChannelImpl
+                    .streamDelegate()
+                    .asBroadcastStream()
+                    .listen((event) {
                   if (event == "onSessionProposal") {
-                    runBottomSheet();
+                    if (isBottomSheet == false) {
+                      isBottomSheet = true;
+                      runBottomSheet();
+                    }
                   }
                 });
               },
@@ -100,6 +107,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void runBottomSheet() {
     showModalBottomSheet<void>(
       context: context,
+      isDismissible: false,
       builder: (BuildContext context) {
         return Container(
           height: 200,
@@ -109,10 +117,14 @@ class _MyHomePageState extends State<MyHomePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Text('Modal BottomSheet'),
+                const Text('Appprove?'),
                 ElevatedButton(
-                  child: const Text('Close BottomSheet'),
-                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Approve'),
+                  onPressed: () async {
+                    isBottomSheet = false;
+                    await methodChannelImpl.approve(() {}, () {});
+                    Navigator.pop(context);
+                  },
                 )
               ],
             ),

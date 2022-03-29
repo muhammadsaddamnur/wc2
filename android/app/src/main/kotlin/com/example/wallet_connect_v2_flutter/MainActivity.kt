@@ -14,7 +14,7 @@ import java.util.*
 private var eventSink: EventChannel.EventSink? = null
 
 interface DelegateValue {
-    fun setValue(nilai:String)
+    fun setValue(resVal:String)
 }
 
 class MainActivity: FlutterActivity() {
@@ -70,28 +70,25 @@ class MainActivity: FlutterActivity() {
     }
 
     object StreamDelegate : EventChannel.StreamHandler, DelegateValue {
-        var nilaiAkhir: String = "wkwk"
+        var res: String = ""
         var sink: EventChannel.EventSink? = null
+        var handler: Handler? = null
 
-        override fun setValue(nilai:String) {
-            nilaiAkhir = nilai
-
-            Handler(Looper.getMainLooper()).post {
-                sink?.success(nilaiAkhir)
+        override fun setValue(resVal:String) {
+            res = resVal
+            handler = Handler(Looper.getMainLooper())
+            handler!!.post {
+                sink?.success(res)
             }
-            println("======")
         }
 
         override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-    //        events?.success("wkwk")
             sink = events
-            sink?.success(nilaiAkhir)
-            println("on listen " + nilaiAkhir)
+            sink?.success(res)
         }
 
         override fun onCancel(arguments: Any?) {
             sink = null
-
         }
 
     }

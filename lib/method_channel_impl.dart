@@ -1,8 +1,16 @@
 import 'package:flutter/services.dart';
 
 class MethodChannelImpl {
-  static const platform = MethodChannel('wallet_connect_2');
-  static const eventChannel = EventChannel('streamDelegate');
+  static final MethodChannelImpl _intance = MethodChannelImpl._internal();
+
+  MethodChannelImpl._internal();
+
+  factory MethodChannelImpl() {
+    return _intance;
+  }
+
+  MethodChannel platform = const MethodChannel('wallet_connect_2');
+  EventChannel eventChannel = const EventChannel('streamDelegate');
 
   Future pair(String uri, Function onSuccess, Function onError) async {
     try {
