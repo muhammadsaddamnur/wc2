@@ -1,14 +1,21 @@
 package com.example.wallet_connect_v2_flutter
 
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.NonNull
 import com.walletconnect.walletconnectv2.client.WalletConnect
 import com.walletconnect.walletconnectv2.client.WalletConnectClient
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.*
 
+private var eventSink: EventChannel.EventSink? = null
+
+interface DelegateValue {
+    fun setValue(nilai:String)
+}
 
 class MainActivity: FlutterActivity() {
 
@@ -34,10 +41,12 @@ class MainActivity: FlutterActivity() {
 
     private lateinit var ugSession: WalletConnect.Model.UpgradedSession
 
+
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         messager =flutterEngine.dartExecutor.binaryMessenger
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler {
+        MethodChannel(messager, CHANNEL).setMethodCallHandler {
                 call, result ->
             when(call.method){
                 "pair"-> {
@@ -56,6 +65,35 @@ class MainActivity: FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        EventChannel(messager, "streamDelegate").setStreamHandler(StreamDelegate)
+    }
+
+    object StreamDelegate : EventChannel.StreamHandler, DelegateValue {
+        var nilaiAkhir: String = "wkwk"
+        var sink: EventChannel.EventSink? = null
+
+        override fun setValue(nilai:String) {
+            nilaiAkhir = nilai
+
+            Handler(Looper.getMainLooper()).post {
+                sink?.success(nilaiAkhir)
+            }
+            println("======")
+        }
+
+        override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+    //        events?.success("wkwk")
+            sink = events
+            sink?.success(nilaiAkhir)
+            println("on listen " + nilaiAkhir)
+        }
+
+        override fun onCancel(arguments: Any?) {
+            sink = null
+
+        }
+
     }
 
     private fun pair(uri:String, result: MethodChannel.Result){
@@ -79,22 +117,22 @@ class MainActivity: FlutterActivity() {
         val walletDelegate = object : WalletConnectClient.WalletDelegate {
             override fun onSessionProposal(sessionProposal: WalletConnect.Model.SessionProposal) {
                 sProposal = sessionProposal
-//                result.success("onSessionProposal")
+                StreamDelegate.setValue("onSessionProposal")
             }
 
             override fun onSessionRequest(sessionRequest: WalletConnect.Model.SessionRequest) {
                 sRequest = sessionRequest
-//                result.success("onSessionRequest")
+                StreamDelegate.setValue("onSessionRequest")
             }
 
             override fun onSessionDelete(deletedSession: WalletConnect.Model.DeletedSession) {
                 dSession = deletedSession
-//                result.success("onSessionDelete")
+                StreamDelegate.setValue("onSessionDelete")
             }
 
             override fun onSessionNotification(sessionNotification: WalletConnect.Model.SessionNotification) {
                 sNotification = sessionNotification
-//                result.success("onSessionNotification")
+                StreamDelegate.setValue("onSessionNotification")
             }
         }
         WalletConnectClient.setWalletDelegate(walletDelegate)

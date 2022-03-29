@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 class MethodChannelImpl {
   static const platform = MethodChannel('wallet_connect_2');
+  static const eventChannel = EventChannel('streamDelegate');
 
   Future pair(String uri, Function onSuccess, Function onError) async {
     try {
@@ -42,6 +43,10 @@ class MethodChannelImpl {
     } on PlatformException catch (e) {
       return e;
     }
+  }
+
+  Stream streamDelegate() {
+    return eventChannel.receiveBroadcastStream().asBroadcastStream();
   }
 
   Future approve(Function onSuccess, Function onError) async {

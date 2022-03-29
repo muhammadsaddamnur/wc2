@@ -35,6 +35,11 @@ class _MyHomePageState extends State<MyHomePage> {
   TextEditingController textEditingController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -58,28 +63,62 @@ class _MyHomePageState extends State<MyHomePage> {
                 await methodChannelImpl.pair(
                     textEditingController.text, () {}, () {});
                 await methodChannelImpl.delegate();
+                print("woyy");
+                methodChannelImpl.streamDelegate().listen((event) {
+                  print('wkwk' + event.toString());
+                  if (event == "onSessionProposal") {
+                    runBottomSheet();
+                  }
+                });
               },
             ),
             ElevatedButton(
                 onPressed: () async {
                   await methodChannelImpl.approve(() {}, () {});
                 },
-                child: Text('Approve'))
-            // ElevatedButton(
-            //   child: const Text('Stream'),
-            //   onPressed: () async {
-            //     _pairStream().listen((event) {
-            //       print(event);
-            //     });
-            //
-            //     _delegateStream().listen((event) {
-            //       print(event);
-            //     });
-            //   },
-            // ),
+                child: const Text('Approve')),
+            StreamBuilder(
+                stream: methodChannelImpl.streamDelegate(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return Text(snapshot.data.toString());
+                  }
+                  return const SizedBox();
+                }),
+            ElevatedButton(
+              child: const Text('Stream'),
+              onPressed: () async {
+                runBottomSheet();
+              },
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  void runBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 200,
+          color: Colors.amber,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Text('Modal BottomSheet'),
+                ElevatedButton(
+                  child: const Text('Close BottomSheet'),
+                  onPressed: () => Navigator.pop(context),
+                )
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
