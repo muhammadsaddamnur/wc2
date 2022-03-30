@@ -217,7 +217,7 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: () async {
                 isBottomSheet = false;
 
-                await methodChannelImpl.disconnect((){}, (){});
+                await methodChannelImpl.disconnect(() {}, () {});
                 setState(() {});
               },
             ),

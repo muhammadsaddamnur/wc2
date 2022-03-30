@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 
 class MethodChannelImpl {
@@ -10,20 +12,35 @@ class MethodChannelImpl {
   }
 
   MethodChannel platform = const MethodChannel('wallet_connect_2');
-  EventChannel eventChannel = const EventChannel('streamDelegate');
+  EventChannel eventStreamDelegate = const EventChannel('streamDelegate');
+  EventChannel eventStreamPair = const EventChannel('streamPair');
+  EventChannel eventStreamDisconnect = const EventChannel('streamDisconnect');
+  EventChannel eventStreamApprove = const EventChannel('streamApprove');
+  EventChannel eventStreamReject = const EventChannel('streamReject');
+  EventChannel eventStreamRespondRequest =
+      const EventChannel('streamRespondRequest');
+  EventChannel eventStreamRejectRequest =
+      const EventChannel('streamRejectRequest');
+  EventChannel eventStreamSessionUpdate =
+      const EventChannel('streamSessionUpdate');
+  EventChannel eventStreamSessionUpgrade =
+      const EventChannel('streamSessionUpgrade');
+  EventChannel eventStreamSessionPing = const EventChannel('streamSessionPing');
 
   Future pair(String uri, Function onSuccess, Function onError) async {
     try {
-      String result =
-          await platform.invokeMethod('pair', <String, dynamic>{'uri': uri});
+      platform.invokeMethod('pair', <String, dynamic>{'uri': uri});
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+      streamPair().listen((event) {
+        print(
+          'listen pair ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -31,15 +48,17 @@ class MethodChannelImpl {
 
   Future disconnect(Function onSuccess, Function onError) async {
     try {
-      String result = await platform.invokeMethod('disconnect');
+      platform.invokeMethod('disconnect');
+      streamDisconnect().listen((event) {
+        print(
+          'listen disconnect ' + event.toString(),
+        );
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -53,23 +72,21 @@ class MethodChannelImpl {
     }
   }
 
-  Stream streamDelegate() {
-    return eventChannel.receiveBroadcastStream().asBroadcastStream();
-  }
-
   Future approve(
       List<String> accounts, Function onSuccess, Function onError) async {
     try {
-      String result = await platform
-          .invokeMethod('approve', <String, dynamic>{'accounts': accounts});
+      platform.invokeMethod('approve', <String, dynamic>{'accounts': accounts});
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+      streamApprove().listen((event) {
+        print(
+          'listen approve ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -77,15 +94,18 @@ class MethodChannelImpl {
 
   Future reject(Function onSuccess, Function onError) async {
     try {
-      String result = await platform.invokeMethod('reject');
+      platform.invokeMethod('reject');
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+      streamReject().listen((event) {
+        print(
+          'listen reject ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -94,16 +114,13 @@ class MethodChannelImpl {
   Future respondRequest(
       String sign, Function onSuccess, Function onError) async {
     try {
-      String result = await platform
-          .invokeMethod('respondRequest', <String, dynamic>{'sign': sign});
+      platform.invokeMethod('respondRequest', <String, dynamic>{'sign': sign});
 
-      if (result == "onError") {
-        print('error');
-        onError;
-      } else {
-        print('success');
-        onSuccess;
-      }
+      streamRespondRequest().listen((event) {
+        print(
+          'listen respond request ' + event.toString(),
+        );
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -111,15 +128,13 @@ class MethodChannelImpl {
 
   Future rejectRequest(Function onSuccess, Function onError) async {
     try {
-      String result = await platform.invokeMethod('rejectRequest');
+      await platform.invokeMethod('rejectRequest');
 
-      if (result == "onError") {
-        print('error');
-        onError;
-      } else {
-        print('success');
-        onSuccess;
-      }
+      streamRejectRequest().listen((event) {
+        print(
+          'listen reject request ' + event.toString(),
+        );
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -128,16 +143,19 @@ class MethodChannelImpl {
   Future sessionUpdate(
       List<String> accounts, Function onSuccess, Function onError) async {
     try {
-      String result = await platform.invokeMethod(
+      platform.invokeMethod(
           'sessionUpdate', <String, dynamic>{'accounts': accounts});
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+      streamSessionUpdate().listen((event) {
+        print(
+          'listen session update ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -146,19 +164,21 @@ class MethodChannelImpl {
   Future sessionUpgrade(List<String> chains, List<String> jsonrpc,
       Function onSuccess, Function onError) async {
     try {
-      String result =
-          await platform.invokeMethod('sessionUpgrade', <String, dynamic>{
+      platform.invokeMethod('sessionUpgrade', <String, dynamic>{
         'chains': chains,
         'jsonrpc': jsonrpc,
       });
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error');
-        onError;
-      }
+      streamSessionUpgrade().listen((event) {
+        print(
+          'listen session upgrade ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
@@ -166,17 +186,68 @@ class MethodChannelImpl {
 
   Future sessionPing(Function onSuccess, Function onError) async {
     try {
-      String result = await platform.invokeMethod('sessionPing');
+      platform.invokeMethod('sessionPing');
 
-      if (result == "onSuccess") {
-        print('success');
-        onSuccess;
-      } else {
-        print('error : $result');
-        onError;
-      }
+      streamSessionPing().listen((event) {
+        print(
+          'listen session ping ' + event.toString(),
+        );
+
+        var dec = json.decode(event.toString());
+        if (dec['T'] == 'onSuccess') {
+          onSuccess;
+        }
+      });
     } on PlatformException catch (e) {
       return e;
     }
+  }
+
+  Stream streamDelegate() {
+    return eventStreamDelegate.receiveBroadcastStream().asBroadcastStream();
+  }
+
+  Stream streamPair() {
+    return eventStreamPair.receiveBroadcastStream().asBroadcastStream();
+  }
+
+  Stream streamDisconnect() {
+    return eventStreamDisconnect.receiveBroadcastStream().asBroadcastStream();
+  }
+
+  Stream streamApprove() {
+    return eventStreamApprove.receiveBroadcastStream().asBroadcastStream();
+  }
+
+  Stream streamReject() {
+    return eventStreamReject.receiveBroadcastStream().asBroadcastStream();
+  }
+
+  Stream streamRespondRequest() {
+    return eventStreamRespondRequest
+        .receiveBroadcastStream()
+        .asBroadcastStream();
+  }
+
+  Stream streamRejectRequest() {
+    return eventStreamRejectRequest
+        .receiveBroadcastStream()
+        .asBroadcastStream();
+  }
+
+  Stream streamSessionUpdate() {
+    return eventStreamSessionUpdate
+        .receiveBroadcastStream()
+        .asBroadcastStream();
+  }
+
+  Stream streamSessionUpgrade() {
+    return eventStreamSessionUpgrade
+        .receiveBroadcastStream()
+        .asBroadcastStream();
+  }
+
+  Stream streamSessionPing() {
+    return eventStreamSessionPing.receiveBroadcastStream().asBroadcastStream();
   }
 }
