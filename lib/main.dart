@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:wallet_connect_v2_flutter/method_channel_impl.dart';
 
@@ -33,12 +35,37 @@ class _MyHomePageState extends State<MyHomePage> {
   MethodChannelImpl methodChannelImpl = MethodChannelImpl();
   String message = '';
   TextEditingController textEditingController = TextEditingController();
-
   bool isBottomSheet = false;
+  dynamic dec;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  stream() {
+    methodChannelImpl.streamDelegate().asBroadcastStream().listen((event) {
+      print('listen');
+      if (event != null) {
+        dec = json.decode(event.toString());
+
+        switch (dec['T']) {
+          case "onSessionProposal":
+            if (isBottomSheet == false) {
+              isBottomSheet = true;
+              runBSProposal();
+            }
+            break;
+          case "onSessionRequest":
+            if (isBottomSheet == false) {
+              isBottomSheet = true;
+              runBSProposal();
+            }
+            break;
+          default:
+        }
+      }
+    });
   }
 
   @override
@@ -48,8 +75,7 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(
           children: <Widget>[
             Text(message),
             // ElevatedButton(
@@ -64,70 +90,239 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: () async {
                 await methodChannelImpl.pair(
                     textEditingController.text, () {}, () {});
+
                 methodChannelImpl.delegate();
+                stream();
                 print("woyy");
                 methodChannelImpl
                     .streamDelegate()
                     .asBroadcastStream()
                     .listen((event) {
-                  if (event == "onSessionProposal") {
-                    if (isBottomSheet == false) {
-                      isBottomSheet = true;
-                      runBottomSheet();
+                  print('listen');
+                  if (event != null) {
+                    dec = json.decode(event.toString());
+                    if (dec['T'] == "onSessionProposal") {
+                      if (isBottomSheet == false) {
+                        isBottomSheet = true;
+                        runBSProposal();
+                      }
                     }
                   }
                 });
               },
             ),
+            // ElevatedButton(
+            //     onPressed: () async {
+            //       await methodChannelImpl.approve(() {}, () {});
+            //     },
+            //     child: const Text('Approve')),
             ElevatedButton(
-                onPressed: () async {
-                  await methodChannelImpl.approve(() {}, () {});
+                onPressed: () {
+                  runBSProposal();
                 },
-                child: const Text('Approve')),
+                child: Text('Bottom')),
             StreamBuilder(
-                stream: methodChannelImpl.streamDelegate(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData) {
-                    return Text(snapshot.data.toString());
-                  }
-                  return const SizedBox();
-                }),
-            ElevatedButton(
-              child: const Text('Stream'),
-              onPressed: () async {
-                runBottomSheet();
+              stream: methodChannelImpl.streamDelegate().asBroadcastStream(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  // stream();
+                  return Text(snapshot.data.toString());
+                }
+                return const SizedBox();
               },
             ),
+            // ElevatedButton(
+            //   child: const Text('Stream'),
+            //   onPressed: () async {
+            //     runBottomSheet();
+            //   },
+            // ),
           ],
         ),
       ),
     );
   }
 
-  void runBottomSheet() {
+  void runBSProposal() {
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
       builder: (BuildContext context) {
         return Container(
-          height: 200,
-          color: Colors.amber,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const Text('Appprove?'),
-                ElevatedButton(
-                  child: const Text('Approve'),
-                  onPressed: () async {
-                    isBottomSheet = false;
-                    await methodChannelImpl.approve(() {}, () {});
-                    Navigator.pop(context);
-                  },
-                )
-              ],
-            ),
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ListView(children: [
+              Text('Session Proposal'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        child: Image.network(dec['icons'][0]),
+                      ),
+                      SizedBox(
+                        width: 5,
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(dec['name']),
+                          Text(
+                            dec['url'],
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                  Divider(),
+                  Text(
+                    'Blockchain(s)',
+                  ),
+                  Text(
+                    dec['chains'][0],
+                  ),
+                  Divider(),
+                  Text(
+                    'Relay Protocol',
+                  ),
+                  Text(
+                    dec['relayProtocol'],
+                  ),
+                  Divider(),
+                  Text(
+                    'Method',
+                  ),
+                  Text(
+                    dec['methods'].toString(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      ElevatedButton(
+                        child: const Text('Reject'),
+                        onPressed: () async {
+                          isBottomSheet = false;
+                          await methodChannelImpl.reject(() {}, () {});
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                        style: ButtonStyle(
+                            backgroundColor:
+                                MaterialStateProperty.all(Colors.red)),
+                      ),
+                      SizedBox(
+                        width: 10,
+                      ),
+                      ElevatedButton(
+                        child: const Text('Approve'),
+                        onPressed: () async {
+                          isBottomSheet = false;
+                          await methodChannelImpl.approve(() {}, () {});
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  void runBSRequest() {
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      builder: (BuildContext context) {
+        return Container(
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ListView(children: [
+              Text('Session Proposal'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        child: Image.network(dec['icons'][0]),
+                      ),
+                      SizedBox(
+                        width: 5,
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(dec['name']),
+                          Text(
+                            dec['url'],
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                  Divider(),
+                  Text(
+                    'Blockchain(s)',
+                  ),
+                  Text(
+                    dec['chains'][0],
+                  ),
+                  Divider(),
+                  Text(
+                    'Relay Protocol',
+                  ),
+                  Text(
+                    dec['relayProtocol'],
+                  ),
+                  Divider(),
+                  Text(
+                    'Method',
+                  ),
+                  Text(
+                    dec['methods'].toString(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      ElevatedButton(
+                        child: const Text('Reject'),
+                        onPressed: () async {
+                          isBottomSheet = false;
+                          await methodChannelImpl.reject(() {}, () {});
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                        style: ButtonStyle(
+                            backgroundColor:
+                                MaterialStateProperty.all(Colors.red)),
+                      ),
+                      SizedBox(
+                        width: 10,
+                      ),
+                      ElevatedButton(
+                        child: const Text('Approve'),
+                        onPressed: () async {
+                          isBottomSheet = false;
+                          await methodChannelImpl.approve(() {}, () {});
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            ]),
           ),
         );
       },

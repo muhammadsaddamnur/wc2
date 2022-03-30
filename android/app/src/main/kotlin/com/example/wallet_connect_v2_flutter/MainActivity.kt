@@ -9,12 +9,13 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONObject
 import java.util.*
 
 private var eventSink: EventChannel.EventSink? = null
 
 interface DelegateValue {
-    fun setValue(resVal:String)
+    fun setValue(resVal:Map<String, Any?>)
 }
 
 class MainActivity: FlutterActivity() {
@@ -70,21 +71,25 @@ class MainActivity: FlutterActivity() {
     }
 
     object StreamDelegate : EventChannel.StreamHandler, DelegateValue {
-        var res: String = ""
+        var res: Map<String, Any?> = mapOf()
         var sink: EventChannel.EventSink? = null
         var handler: Handler? = null
 
-        override fun setValue(resVal:String) {
+        override fun setValue(resVal:Map<String, Any?>) {
             res = resVal
             handler = Handler(Looper.getMainLooper())
             handler!!.post {
-                sink?.success(res)
+                sink?.success(
+                    JSONObject(res).toString()
+                )
             }
         }
 
         override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
             sink = events
-            sink?.success(res)
+            sink?.success(
+                JSONObject(res).toString()
+            )
         }
 
         override fun onCancel(arguments: Any?) {
@@ -114,22 +119,59 @@ class MainActivity: FlutterActivity() {
         val walletDelegate = object : WalletConnectClient.WalletDelegate {
             override fun onSessionProposal(sessionProposal: WalletConnect.Model.SessionProposal) {
                 sProposal = sessionProposal
-                StreamDelegate.setValue("onSessionProposal")
+                // T for Response Type
+                StreamDelegate.setValue(mapOf(
+                    "T" to "onSessionProposal",
+                    "accounts" to sProposal.accounts,
+                    "chains" to sProposal.chains,
+                    "description" to sProposal.description,
+                    "icons" to sProposal.icons,
+                    "isController" to sProposal.isController,
+                    "methods" to sProposal.methods,
+                    "name" to sProposal.name,
+                    "proposerPublicKey" to sProposal.proposerPublicKey,
+                    "relayProtocol" to sProposal.relayProtocol,
+                    "topic" to sProposal.topic,
+                    "ttl" to sProposal.ttl,
+                    "types" to sProposal.types,
+                    "url" to sProposal.url,
+                ))
             }
 
             override fun onSessionRequest(sessionRequest: WalletConnect.Model.SessionRequest) {
                 sRequest = sessionRequest
-                StreamDelegate.setValue("onSessionRequest")
+                // T for Response Type
+                StreamDelegate.setValue(mapOf(
+                    "T" to "onSessionRequest",
+                    "chainId" to sRequest.chainId,
+                    "request" to mapOf<String, Any?>(
+                        "method" to sRequest.request.method,
+                        "id" to sRequest.request.id,
+                        "params" to sRequest.request.params,
+                    ),
+                    "topic" to sRequest.topic,
+                ))
             }
 
             override fun onSessionDelete(deletedSession: WalletConnect.Model.DeletedSession) {
                 dSession = deletedSession
-                StreamDelegate.setValue("onSessionDelete")
+                // T for Response Type
+                StreamDelegate.setValue(mapOf(
+                    "T" to "onSessionDelete",
+                    "reason" to dSession.reason,
+                    "topic" to dSession.topic,
+                ))
             }
 
             override fun onSessionNotification(sessionNotification: WalletConnect.Model.SessionNotification) {
                 sNotification = sessionNotification
-                StreamDelegate.setValue("onSessionNotification")
+                // T for Response Type
+                StreamDelegate.setValue(mapOf(
+                    "T" to "onSessionNotification",
+                    "data" to sNotification.data,
+                    "topic" to sNotification.topic,
+                    "type" to sNotification.type,
+                ))
             }
         }
         WalletConnectClient.setWalletDelegate(walletDelegate)

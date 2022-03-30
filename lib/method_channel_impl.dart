@@ -32,22 +32,6 @@ class MethodChannelImpl {
   Future delegate() async {
     try {
       await platform.invokeMethod('delegate');
-      // String result = await platform.invokeMethod('delegate');
-
-      // switch (result) {
-      //   case 'onSessionProposal':
-      //     print('onSessionProposal');
-      //     break;
-      //   case 'onSessionRequest':
-      //     print('onSessionRequest');
-      //     break;
-      //   case 'onSessionDelete':
-      //     print('onSessionDelete');
-      //     break;
-      //   case 'onSessionNotification':
-      //     print('onSessionNotification');
-      //     break;
-      // }
     } on PlatformException catch (e) {
       return e;
     }
@@ -60,6 +44,22 @@ class MethodChannelImpl {
   Future approve(Function onSuccess, Function onError) async {
     try {
       String result = await platform.invokeMethod('approve');
+
+      if (result == "onSuccess") {
+        print('success');
+        onSuccess;
+      } else {
+        print('error');
+        onError;
+      }
+    } on PlatformException catch (e) {
+      return e;
+    }
+  }
+
+  Future reject(Function onSuccess, Function onError) async {
+    try {
+      String result = await platform.invokeMethod('reject');
 
       if (result == "onSuccess") {
         print('success');
