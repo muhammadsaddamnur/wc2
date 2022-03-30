@@ -111,32 +111,116 @@ class _MyHomePageState extends State<MyHomePage> {
                 });
               },
             ),
-            // ElevatedButton(
-            //     onPressed: () async {
-            //       await methodChannelImpl.approve(() {}, () {});
-            //     },
-            //     child: const Text('Approve')),
-            ElevatedButton(
-                onPressed: () {
-                  runBSProposal();
-                },
-                child: Text('Bottom')),
             StreamBuilder(
               stream: methodChannelImpl.streamDelegate().asBroadcastStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasData) {
                   // stream();
-                  return Text(snapshot.data.toString());
+                  dec = json.decode(snapshot.data.toString());
+                  // if (dec['T'] == "onSessionRequest") {
+                  //   switch (dec['value']['request']['method']) {
+                  //     case :
+
+                  //       break;
+                  //     default:
+                  //   }
+                  // }
+                  return Column(
+                    children: [
+                      Text(dec.toString()),
+                      if (dec['T'] == "onSessionRequest")
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                methodChannelImpl.rejectRequest(
+                                  () {},
+                                  () {},
+                                );
+                              },
+                              child: Text('Reject'),
+                            ),
+                            SizedBox(
+                              width: 10,
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                // String sign = dec['value']['request']['params']
+                                //     .toString()
+                                //     .replaceAll('[', '')
+                                //     .replaceAll(']', '')
+                                //     .split(',')[0];
+                                // print(sign);
+                                methodChannelImpl.respondRequest(
+                                  '0xa3f20717a250c2b0b729b7e5becbff67fdaef7e0699da4de7ca5895b02a170a12d887fd3b17bfdce3481f10bea41f45ba9f709d39ce8325427b57afcfc994cee1b',
+                                  () {},
+                                  () {},
+                                );
+                              },
+                              child: Text('Approve'),
+                            ),
+                          ],
+                        )
+                    ],
+                  );
                 }
                 return const SizedBox();
               },
             ),
-            // ElevatedButton(
-            //   child: const Text('Stream'),
-            //   onPressed: () async {
-            //     runBottomSheet();
-            //   },
-            // ),
+            ElevatedButton(
+              child: const Text('Session Update'),
+              onPressed: () async {
+                isBottomSheet = false;
+                // List chains = dec['value']['chains'];
+                List chains = ["eip155:42"]; // example Ethereum Kovan
+                await methodChannelImpl.sessionUpdate(
+                  chains.map((chainId) {
+                    return "$chainId:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716";
+                  }).toList(),
+                  () {},
+                  () {},
+                );
+                ;
+                setState(() {});
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Session Upgrade'),
+              onPressed: () async {
+                isBottomSheet = false;
+                // List chains = dec['value']['chains'];
+                List<String> chains = ["eip155:42"]; // example Ethereum Kovan
+                List<String> jsonrpc = ["eth_sign"];
+                await methodChannelImpl.sessionUpgrade(
+                  chains,
+                  jsonrpc,
+                  () {},
+                  () {},
+                );
+                setState(() {});
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Session Ping'),
+              onPressed: () async {
+                isBottomSheet = false;
+
+                await methodChannelImpl.sessionPing(
+                  () {},
+                  () {},
+                );
+                setState(() {});
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Disconnect'),
+              onPressed: () async {
+                isBottomSheet = false;
+
+                await methodChannelImpl.disconnect((){}, (){});
+                setState(() {});
+              },
+            ),
           ],
         ),
       ),
@@ -160,7 +244,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     children: [
                       CircleAvatar(
-                        child: Image.network(dec['icons'][0]),
+                        child: Image.network(dec['value']['icons'][0]),
                       ),
                       SizedBox(
                         width: 5,
@@ -168,9 +252,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(dec['name']),
+                          Text(dec['value']['name']),
                           Text(
-                            dec['url'],
+                            dec['value']['url'],
                           )
                         ],
                       )
@@ -181,21 +265,21 @@ class _MyHomePageState extends State<MyHomePage> {
                     'Blockchain(s)',
                   ),
                   Text(
-                    dec['chains'][0],
+                    dec['value']['chains'][0],
                   ),
                   Divider(),
                   Text(
                     'Relay Protocol',
                   ),
                   Text(
-                    dec['relayProtocol'],
+                    dec['value']['relayProtocol'],
                   ),
                   Divider(),
                   Text(
                     'Method',
                   ),
                   Text(
-                    dec['methods'].toString(),
+                    dec['value']['methods'].toString(),
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -220,100 +304,14 @@ class _MyHomePageState extends State<MyHomePage> {
                         child: const Text('Approve'),
                         onPressed: () async {
                           isBottomSheet = false;
-                          await methodChannelImpl.approve(() {}, () {});
-                          Navigator.pop(context);
-                          setState(() {});
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            ]),
-          ),
-        );
-      },
-    );
-  }
-
-  void runBSRequest() {
-    showModalBottomSheet<void>(
-      context: context,
-      isDismissible: false,
-      builder: (BuildContext context) {
-        return Container(
-          height: MediaQuery.of(context).size.height,
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ListView(children: [
-              Text('Session Proposal'),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        child: Image.network(dec['icons'][0]),
-                      ),
-                      SizedBox(
-                        width: 5,
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(dec['name']),
-                          Text(
-                            dec['url'],
-                          )
-                        ],
-                      )
-                    ],
-                  ),
-                  Divider(),
-                  Text(
-                    'Blockchain(s)',
-                  ),
-                  Text(
-                    dec['chains'][0],
-                  ),
-                  Divider(),
-                  Text(
-                    'Relay Protocol',
-                  ),
-                  Text(
-                    dec['relayProtocol'],
-                  ),
-                  Divider(),
-                  Text(
-                    'Method',
-                  ),
-                  Text(
-                    dec['methods'].toString(),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: <Widget>[
-                      ElevatedButton(
-                        child: const Text('Reject'),
-                        onPressed: () async {
-                          isBottomSheet = false;
-                          await methodChannelImpl.reject(() {}, () {});
-                          Navigator.pop(context);
-                          setState(() {});
-                        },
-                        style: ButtonStyle(
-                            backgroundColor:
-                                MaterialStateProperty.all(Colors.red)),
-                      ),
-                      SizedBox(
-                        width: 10,
-                      ),
-                      ElevatedButton(
-                        child: const Text('Approve'),
-                        onPressed: () async {
-                          isBottomSheet = false;
-                          await methodChannelImpl.approve(() {}, () {});
+                          List chains = dec['value']['chains'];
+                          await methodChannelImpl.approve(
+                            chains.map((chainId) {
+                              return "$chainId:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716";
+                            }).toList(),
+                            () {},
+                            () {},
+                          );
                           Navigator.pop(context);
                           setState(() {});
                         },

@@ -12,7 +12,6 @@ import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
 import java.util.*
 
-private var eventSink: EventChannel.EventSink? = null
 
 interface DelegateValue {
     fun setValue(resVal:Map<String, Any?>)
@@ -56,12 +55,25 @@ class MainActivity: FlutterActivity() {
                 }
                 "delegate" -> delegate(result)
                 "disconnect" -> disconnect(result)
-                "approve" -> approve(result)
+                "approve" -> {
+                    val accounts = call.argument<List<String>>("accounts")
+                    approve(accounts!!, result)
+                }
                 "reject" -> reject(result)
-                "respondRequest" -> respondRequest(result)
+                "respondRequest" -> {
+                    val sign = call.argument<String>("sign")
+                    respondRequest(sign!!, result)
+                }
                 "rejectRequest" -> rejectRequest(result)
-                "sessionUpdate" -> sessionUpdate(result)
-                "sessionUpgrade" -> sessionUpgrade(result)
+                "sessionUpdate" -> {
+                    val accounts = call.argument<List<String>>("accounts")
+                    sessionUpdate(accounts!!, result)
+                }
+                "sessionUpgrade" -> {
+                    val chains = call.argument<List<String>>("chains")
+                    val jsonrpc = call.argument<List<String>>("jsonrpc")
+                    sessionUpgrade(chains!!, jsonrpc!!,result)
+                }
                 "sessionPing" -> sessionPing(result)
                 else -> result.notImplemented()
             }
@@ -98,6 +110,14 @@ class MainActivity: FlutterActivity() {
 
     }
 
+   private fun resultOnSuccess(res : Map<String, Any?>) : String {
+      val result: Map<String, Any?> = mapOf(
+           "T" to "onSuccess",
+           "value" to res
+       )
+       return JSONObject(result).toString()
+   }
+
     private fun pair(uri:String, result: MethodChannel.Result){
         val pair = WalletConnect.Params.Pair(uri.trim())
         WalletConnectClient.pair(pair, object : WalletConnect.Listeners.Pairing {
@@ -105,10 +125,31 @@ class MainActivity: FlutterActivity() {
                 //Settled pairing
                 println("=================== pair")
                 sPairing = settledPairing
-                result.success("onSuccess")
+                if(sPairing.metaData!= null){
+                    result.success(resultOnSuccess(
+                        mapOf(
+                            "metaData" to mapOf(
+                                "description" to sPairing.metaData!!.description,
+                                "icons" to sPairing.metaData!!.icons,
+                                "name" to sPairing.metaData!!.name,
+                                "url" to sPairing.metaData!!.url,
+                            ),
+                            "topic" to sPairing.topic,
+                        )
+                    ))
+                } else {
+                    result.success(resultOnSuccess(
+                        mapOf(
+                            "metaData" to sPairing.metaData,
+                            "topic" to sPairing.topic,
+                        )
+                    ))
+                }
+
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
@@ -122,19 +163,21 @@ class MainActivity: FlutterActivity() {
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
                     "T" to "onSessionProposal",
-                    "accounts" to sProposal.accounts,
-                    "chains" to sProposal.chains,
-                    "description" to sProposal.description,
-                    "icons" to sProposal.icons,
-                    "isController" to sProposal.isController,
-                    "methods" to sProposal.methods,
-                    "name" to sProposal.name,
-                    "proposerPublicKey" to sProposal.proposerPublicKey,
-                    "relayProtocol" to sProposal.relayProtocol,
-                    "topic" to sProposal.topic,
-                    "ttl" to sProposal.ttl,
-                    "types" to sProposal.types,
-                    "url" to sProposal.url,
+                    "value" to mapOf(
+                        "accounts" to sProposal.accounts,
+                        "chains" to sProposal.chains,
+                        "description" to sProposal.description,
+                        "icons" to sProposal.icons,
+                        "isController" to sProposal.isController,
+                        "methods" to sProposal.methods,
+                        "name" to sProposal.name,
+                        "proposerPublicKey" to sProposal.proposerPublicKey,
+                        "relayProtocol" to sProposal.relayProtocol,
+                        "topic" to sProposal.topic,
+                        "ttl" to sProposal.ttl,
+                        "types" to sProposal.types,
+                        "url" to sProposal.url,
+                    )
                 ))
             }
 
@@ -143,13 +186,15 @@ class MainActivity: FlutterActivity() {
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
                     "T" to "onSessionRequest",
-                    "chainId" to sRequest.chainId,
-                    "request" to mapOf<String, Any?>(
-                        "method" to sRequest.request.method,
-                        "id" to sRequest.request.id,
-                        "params" to sRequest.request.params,
-                    ),
-                    "topic" to sRequest.topic,
+                    "value" to mapOf(
+                        "chainId" to sRequest.chainId,
+                        "request" to mapOf<String, Any?>(
+                            "method" to sRequest.request.method,
+                            "id" to sRequest.request.id,
+                            "params" to sRequest.request.params,
+                        ),
+                        "topic" to sRequest.topic,
+                    )
                 ))
             }
 
@@ -158,8 +203,10 @@ class MainActivity: FlutterActivity() {
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
                     "T" to "onSessionDelete",
-                    "reason" to dSession.reason,
-                    "topic" to dSession.topic,
+                    "value" to mapOf(
+                        "reason" to dSession.reason,
+                        "topic" to dSession.topic,
+                    )
                 ))
             }
 
@@ -168,9 +215,11 @@ class MainActivity: FlutterActivity() {
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
                     "T" to "onSessionNotification",
-                    "data" to sNotification.data,
-                    "topic" to sNotification.topic,
-                    "type" to sNotification.type,
+                    "value" to mapOf(
+                        "data" to sNotification.data,
+                        "topic" to sNotification.topic,
+                        "type" to sNotification.type,
+                    )
                 ))
             }
         }
@@ -187,27 +236,54 @@ class MainActivity: FlutterActivity() {
         WalletConnectClient.disconnect(disconnect, object : WalletConnect.Listeners.SessionDelete {
             override fun onSuccess(deletedSession: WalletConnect.Model.DeletedSession) {
                 dSession = deletedSession
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "reason" to dSession.reason,
+                        "topic" to dSession.topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
     }
 
-    private fun approve(result: MethodChannel.Result){
+    // accounts is List<String> of chainId:address
+    // example :
+    // ["eip155:1:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716"]
+    private fun approve(accounts:List<String>, result: MethodChannel.Result){
         // Session Proposal object sent by Dapp after pairing was successful
-        val accounts = sProposal.chains.map { chainId -> "$chainId:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716" }
+        // val accounts = sProposal.chains.map { chainId -> "$chainId:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716" }
         val approve = WalletConnect.Params.Approve(sProposal, accounts)
 
         WalletConnectClient.approve(approve, object : WalletConnect.Listeners.SessionApprove {
             override fun onSuccess(settledSession: WalletConnect.Model.SettledSession) {
                 sSession = settledSession
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "accounts" to sSession.accounts,
+                        "peerAppMetaData" to sSession.peerAppMetaData,
+                        "permissions" to mapOf(
+                            "blockchain" to  mapOf(
+                                "chains" to sSession.permissions.blockchain.chains,
+                            ),
+                            "jsonRpc" to  mapOf(
+                                "methods" to sSession.permissions.jsonRpc.methods
+                            ),
+                            "notifications" to  mapOf(
+                                "types" to sSession.permissions.notifications.types
+                            ),
+                        ),
+                        "topic" to sSession.topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
@@ -221,26 +297,33 @@ class MainActivity: FlutterActivity() {
         WalletConnectClient.reject(reject, object : WalletConnect.Listeners.SessionReject {
             override fun onSuccess(rejectedSession: WalletConnect.Model.RejectedSession) {
                 rSession = rejectedSession
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "reason" to rSession.reason,
+                        "topic" to rSession.topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
     }
 
-    private fun respondRequest(result: MethodChannel.Result){
+    private fun respondRequest(sign:String, result: MethodChannel.Result){
         val response = WalletConnect.Params.Response(
             sessionTopic = sRequest.topic,
             jsonRpcResponse = WalletConnect.Model.JsonRpcResponse.JsonRpcResult(
                 sRequest.request.id,
-                "0xa3f20717a250c2b0b729b7e5becbff67fdaef7e0699da4de7ca5895b02a170a12d887fd3b17bfdce3481f10bea41f45ba9f709d39ce8325427b57afcfc994cee1b"
+                sign
             )
         )
 
         WalletConnectClient.respond(response, object : WalletConnect.Listeners.SessionPayload {
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
@@ -251,50 +334,74 @@ class MainActivity: FlutterActivity() {
             sessionTopic = sRequest.topic,
             jsonRpcResponse = WalletConnect.Model.JsonRpcResponse.JsonRpcError(
                 sRequest.request.id,
-                WalletConnect.Model.JsonRpcResponse.Error(500, "Flutter Wallet Error")
+                WalletConnect.Model.JsonRpcResponse.Error(500, "Reject Request")
             )
         )
 
         WalletConnectClient.respond(response, object : WalletConnect.Listeners.SessionPayload {
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
     }
 
-    private fun sessionUpdate(result: MethodChannel.Result) {
+    private fun sessionUpdate(accounts:List<String>, result: MethodChannel.Result) {
         val update = WalletConnect.Params.Update(
             sessionTopic = sSession.topic,
-            sessionState = WalletConnect.Model.SessionState(accounts = listOf("${sProposal.chains[0]}:0xa0A6c118b1B25207A8A764E1CAe1635339bedE62"))
+            // sessionState = WalletConnect.Model.SessionState(accounts = listOf("${sProposal.chains[0]}:0xa0A6c118b1B25207A8A764E1CAe1635339bedE62"))
+            sessionState = WalletConnect.Model.SessionState(accounts = accounts)
         )
 
         WalletConnectClient.update(update, object : WalletConnect.Listeners.SessionUpdate {
             override fun onSuccess(updatedSession: WalletConnect.Model.UpdatedSession) {
                 upSession = updatedSession
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "accounts" to upSession.accounts,
+                        "topic" to upSession.topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
     }
 
-    private fun sessionUpgrade(result: MethodChannel.Result) {
+    private fun sessionUpgrade(chains:List<String>, jsonrpc : List<String>, result: MethodChannel.Result) {
         val permissions =
             WalletConnect.Model.SessionPermissions(
-                blockchain = WalletConnect.Model.Blockchain(chains = listOf("eip155:80001")),
-                jsonRpc = WalletConnect.Model.Jsonrpc(listOf("eth_sign"))
+                // blockchain = WalletConnect.Model.Blockchain(chains = listOf("eip155:80001")),
+                // jsonRpc = WalletConnect.Model.Jsonrpc(listOf("eth_sign"))
+                blockchain = WalletConnect.Model.Blockchain(chains = chains),
+                jsonRpc = WalletConnect.Model.Jsonrpc(jsonrpc)
             )
         val upgrade = WalletConnect.Params.Upgrade(topic = sSession.topic, permissions = permissions)
 
         WalletConnectClient.upgrade(upgrade, object : WalletConnect.Listeners.SessionUpgrade {
             override fun onSuccess(upgradedSession: WalletConnect.Model.UpgradedSession) {
                 ugSession = upgradedSession
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "permissions" to mapOf(
+                            "blockchain" to  mapOf(
+                                "chains" to ugSession.permissions.blockchain.chains,
+                            ),
+                            "jsonRpc" to  mapOf(
+                                "methods" to ugSession.permissions.jsonRpc.methods
+                            ),
+                            "notification" to ugSession.permissions.notification,
+                        ),
+                        "topic" to ugSession.topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
@@ -305,10 +412,15 @@ class MainActivity: FlutterActivity() {
 
         WalletConnectClient.ping(ping, object : WalletConnect.Listeners.SessionPing {
             override fun onSuccess(topic: String) {
-                result.success("onSuccess")
+                result.success(resultOnSuccess(
+                    mapOf(
+                        "topic" to topic,
+                    )
+                ))
             }
 
             override fun onError(error: Throwable) {
+                println(error.message)
                 result.error("onError", error.message,error)
             }
         })
