@@ -255,21 +255,6 @@ class MainActivity: FlutterActivity() {
         val ping = WalletConnect.Params.Ping(sSession.topic)
 
         WalletConnectClient.ping(ping, StreamSessionPing)
-
-//        WalletConnectClient.ping(ping, object : WalletConnect.Listeners.SessionPing {
-//            override fun onSuccess(topic: String) {
-//                result.success(resultOnSuccess(
-//                    mapOf(
-//                        "topic" to topic,
-//                    )
-//                ))
-//            }
-//
-//            override fun onError(error: Throwable) {
-//                println(error.message)
-//                result.error("onError", error.message,error)
-//            }
-//        })
     }
 }
 

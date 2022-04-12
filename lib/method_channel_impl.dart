@@ -12,6 +12,7 @@ class MethodChannelImpl {
   }
 
   MethodChannel platform = const MethodChannel('wallet_connect_2');
+
   EventChannel eventStreamDelegate = const EventChannel('streamDelegate');
   EventChannel eventStreamPair = const EventChannel('streamPair');
   EventChannel eventStreamDisconnect = const EventChannel('streamDisconnect');

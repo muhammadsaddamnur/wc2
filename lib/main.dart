@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:wallet_connect_v2_flutter/ios_example.dart';
 import 'package:wallet_connect_v2_flutter/method_channel_impl.dart';
+import 'package:wallet_connect_v2_flutter/method_channel_ios.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +19,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      // home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const IosExample(),
     );
   }
 }
@@ -33,6 +36,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   MethodChannelImpl methodChannelImpl = MethodChannelImpl();
+
   String message = '';
   TextEditingController textEditingController = TextEditingController();
   bool isBottomSheet = false;
@@ -180,7 +184,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   () {},
                   () {},
                 );
-                ;
                 setState(() {});
               },
             ),
