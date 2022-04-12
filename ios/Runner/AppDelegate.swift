@@ -7,7 +7,7 @@ import WalletConnectUtils
 /// extend FlutterStreamHandler
 @objc class AppDelegate: FlutterAppDelegate, WalletConnectClientDelegate,  FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
-//    var sessionItems: [ActiveSessionItem] = []
+    //    var sessionItems: [ActiveSessionItem] = []
     var currentProposal: Session.Proposal?
     var currentRequest: Request?
     
@@ -78,11 +78,15 @@ import WalletConnectUtils
                 let args = call.arguments as! Dictionary<String, Any>
                 let account = args["account"] as! String
                 let topic = args["topic"] as! String
-                self.update(result: result, currentProposal: self.currentProposal!,topic: topic,  account: account)
+                let chains = Set<String>(args["chains"] as! Array)
+                self.update(result: result, chains: chains,topic: topic,  account: account)
             } else if call.method == "upgrade" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
-                self.upgrade(result: result, currentProposal: self.currentProposal!,topic: topic)
+                let chains = Set<String>(args["chains"] as! Array)
+                let methods = Set<String>(args["methods"] as! Array)
+                let notifications = args["notifications"] as! Array<String> 
+                self.upgrade(result: result, chains: chains, methods: methods,notifications: notifications ,topic: topic)
             } else if call.method == "ping" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
@@ -97,34 +101,44 @@ import WalletConnectUtils
     }
     
     /// reload ketika pertama dibuka
-//    private func getActiveSessionItem(for settledSessions: [Session]) -> [ActiveSessionItem] {
-//        return settledSessions.map { session -> ActiveSessionItem in
-//            let app = session.peer
-//            return ActiveSessionItem(
-//                dappName: app.name ?? "",
-//                dappURL: app.url ?? "",
-//                iconURL: app.icons?.first ?? "",
-//                topic: session.topic)
-//        }
-//    }
-//
-//    private func reloadActiveSessions() {
-//        let settledSessions = client!.getSettledSessions()
-//        let activeSessions = getActiveSessionItem(for: settledSessions)
-//        self.sessionItems = activeSessions
-//    }
+    //    private func getActiveSessionItem(for settledSessions: [Session]) -> [ActiveSessionItem] {
+    //        return settledSessions.map { session -> ActiveSessionItem in
+    //            let app = session.peer
+    //            return ActiveSessionItem(
+    //                dappName: app.name ?? "",
+    //                dappURL: app.url ?? "",
+    //                iconURL: app.icons?.first ?? "",
+    //                topic: session.topic)
+    //        }
+    //    }
+    //
+    //    private func reloadActiveSessions() {
+    //        let settledSessions = client!.getSettledSessions()
+    //        let activeSessions = getActiveSessionItem(for: settledSessions)
+    //        self.sessionItems = activeSessions
+    //    }
     
     /// reload tampil di ui
     private func getActiveSessionString(for settledSessions: [Session]) -> [String] {
-        
         return settledSessions.map { session -> String in
-            let app = session.peer
+            let appMetadata = session.peer
             return """
                 {
-                    "dappName": "\(app.name ?? "")",
-                    "dappURL":  "\(app.url ?? "")",
-                    "iconURL":  "\(app.icons?.first ?? "")",
-                    "topic" :  "\(session.topic)"
+                    "T" : "onSessionProposal",
+                    "value": {
+                        "accounts": [],
+                        "chains":  \(session.permissions.blockchains),
+                        "description":  "\((appMetadata.description ?? ""))",
+                        "icons" : \(appMetadata.icons ?? []),
+                        "isController":  "",
+                        "methods":  \(session.permissions.methods),
+                        "name":  "\(appMetadata.name ?? "")",
+                        "proposerPublicKey":  "",
+                        "relayProtocol":  "",
+                        "topic": "\(session.topic)",
+                        "ttl":  "",
+                        "url": "\(appMetadata.url ?? "")"
+                    }
                 }
             """
         }
@@ -133,7 +147,6 @@ import WalletConnectUtils
     private func reloadSessions(result: FlutterResult) {
         let settledSessions = client!.getSettledSessions()
         let activeSessions = getActiveSessionString(for: settledSessions)
-        
         //        self.sessionItems = activeSessions
         result("\(activeSessions)")
     }
@@ -216,7 +229,7 @@ import WalletConnectUtils
     
     
     func ping(result: FlutterResult, topic: String){
-     client!.ping(topic: topic, completion: { value in
+        client!.ping(topic: topic, completion: { value in
             switch value {
             case .success():
                 self.eventSink!("""
@@ -242,8 +255,8 @@ import WalletConnectUtils
         })
     }
     
-    func update(result: FlutterResult, currentProposal: Session.Proposal, topic: String, account: String){
-        let accounts = Set(currentProposal.permissions.blockchains.compactMap{ Account($0+":\(account)") })
+    func update(result: FlutterResult, chains: Set<String>, topic: String, account: String){
+        let accounts = Set(chains.compactMap{ Account($0+":\(account)") })
         do {
             try client!.update(topic: topic, accounts: accounts)
         } catch {
@@ -252,9 +265,10 @@ import WalletConnectUtils
         result("update")
     }
     
-    func upgrade(result: FlutterResult, currentProposal: Session.Proposal, topic: String){
+    func upgrade(result: FlutterResult, chains: Set<String>, methods: Set<String>, notifications: [String], topic: String){
+        let permission =  Session.Permissions(blockchains: chains, methods: methods, notifications: notifications)
         do {
-            try client!.upgrade(topic: topic, permissions: currentProposal.permissions)
+            try client!.upgrade(topic: topic, permissions: permission)
         } catch {
             result("upgrade error")
         }
@@ -282,7 +296,7 @@ import WalletConnectUtils
     /// event channel
     func didSettle(session: Session) {
         print("ini settle")
-//        reloadActiveSessions()
+        //        reloadActiveSessions()
         print(session)
         self.eventSink!("""
              {
@@ -294,7 +308,7 @@ import WalletConnectUtils
             """)
     }
     
-
+    
     /// event channel
     func didDelete(sessionTopic: String, reason: Reason) {
         print(sessionTopic)
@@ -305,7 +319,7 @@ import WalletConnectUtils
     func didUpdate(sessionTopic: String, accounts: Set<Account>) {
         print(sessionTopic)
         let accountsArray = accounts.compactMap { "\($0)" }
-
+        
         self.eventSink!("""
              {
                 "T" : "update",

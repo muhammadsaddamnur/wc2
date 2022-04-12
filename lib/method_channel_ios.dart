@@ -84,26 +84,34 @@ class MethodChannelIOS {
   Future reloadActiveSessions() async {
     try {
       String result = await platform.invokeMethod('reloadSessions');
-      log(result);
+      log(json.decode(result).toString());
       return json.decode(result);
     } on PlatformException catch (e) {
       return e;
     }
   }
 
-  Future update(String topic, String account) async {
+  Future update(String topic, String account, List<String> chains) async {
     try {
-      platform.invokeMethod(
-          'update', <String, dynamic>{'account': account, 'topic': topic});
+      platform.invokeMethod('update', <String, dynamic>{
+        'account': account,
+        'topic': topic,
+        'chains': chains
+      });
     } on PlatformException catch (e) {
       return e;
     }
   }
 
-  Future upgrade(String topic) async {
+  Future upgrade(String topic, List<String> chains, List<String> methods,
+      {List<String> notifications = const []}) async {
     try {
-      String a = await platform
-          .invokeMethod('upgrade', <String, dynamic>{'topic': topic});
+      String a = await platform.invokeMethod('upgrade', <String, dynamic>{
+        'topic': topic,
+        'chains': chains,
+        'methods': methods,
+        'notifications': notifications
+      });
       print(a);
     } on PlatformException catch (e) {
       return e;
@@ -112,8 +120,9 @@ class MethodChannelIOS {
 
   Future ping(String topic) async {
     try {
-      String a = await platform
-          .invokeMethod('ping', <String, dynamic>{'topic': topic});
+      String a = await platform.invokeMethod('ping', <String, dynamic>{
+        'topic': topic,
+      });
       print(a);
     } on PlatformException catch (e) {
       return e;

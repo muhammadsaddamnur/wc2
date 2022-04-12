@@ -67,11 +67,11 @@ class _IosExampleState extends State<IosExample> {
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
               children: sessions!.map((e) {
-                var value = json.decode(e);
+                var value = json.decode(e)['value'];
                 return ListTile(
-                  leading: Image.network(value['iconURL'], width: 30),
-                  title: Text(value['dappName']),
-                  subtitle: Text(value['dappURL']),
+                  leading: Image.network(value['icons'][0], width: 30),
+                  title: Text(value['name']),
+                  subtitle: Text(value['url']),
                   trailing: IconButton(
                       onPressed: () async {
                         await methodChannelIOS.disconnect(value['topic']);
@@ -105,8 +105,10 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('update'),
             onPressed: () async {
               var update = await methodChannelIOS.update(
-                  '3b521cc2f1b374e8f16afb0c9c86081baefe22042598491b4aab1be73f9b4a55',
-                  '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716');
+                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
+                '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716',
+                ["eip155:42", "eip155:80001"],
+              );
               print(update);
             },
           ),
@@ -114,7 +116,15 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('upgrade'),
             onPressed: () async {
               var upgrade = await methodChannelIOS.upgrade(
-                '3b521cc2f1b374e8f16afb0c9c86081baefe22042598491b4aab1be73f9b4a55',
+                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
+                ["eip155:42", "eip155:80001"],
+                [
+                  "eth_sign",
+                  "personal_sign",
+                  "eth_signTransaction",
+                  "eth_signTypedData",
+                  "eth_sendTransaction"
+                ],
               );
               print(upgrade);
             },
@@ -123,7 +133,7 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('ping'),
             onPressed: () async {
               sessions = await methodChannelIOS.ping(
-                '3b521cc2f1b374e8f16afb0c9c86081baefe22042598491b4aab1be73f9b4a55',
+                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
               );
             },
           ),
