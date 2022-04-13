@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:eth_sig_util/eth_sig_util.dart';
 import 'package:flutter/material.dart';
-import 'package:wallet_connect_v2_flutter/event_channel_ios.dart';
+import 'package:wallet_connect_v2_flutter/wc2_client.dart';
 import 'package:wallet_connect_v2_flutter/models/peer_meta.dart';
 import 'package:wallet_connect_v2_flutter/models/session_proposal.dart';
 import 'package:wallet_connect_v2_flutter/models/session_request.dart';
@@ -23,11 +23,11 @@ class IosExample extends StatefulWidget {
 class _IosExampleState extends State<IosExample> {
   TextEditingController textEditingController = TextEditingController();
 
-  MethodChannelIOS methodChannelIOS = MethodChannelIOS();
-
   bool isBottomSheet = false;
 
   List? sessions;
+
+  late WC2Client eventChannelIOS;
 
   final _web3client = Web3Client(
     // 'https://rpc-mainnet.maticvigil.com/v1/140d92ff81094f0f3d7babde06603390d7e581be',
@@ -43,21 +43,7 @@ class _IosExampleState extends State<IosExample> {
   void initState() {
     createWalletAddress();
 
-    methodChannelIOS.initialize(
-      PeerMeta(
-        metadataDescription: "wallet description",
-        metadataIcons: [
-          "https://gblobscdn.gitbook.com/spaces%2F-LJJeCjcLrr53DcT1Ml7%2Favatar.png?alt=media"
-        ],
-        metadataName: "Example Wallet",
-        metadataUrl: "example.wallet",
-        projectId: "4af2e046c7a7cbff0a96dc0f594b7e13",
-        relayHost: "relay.walletconnect.com",
-      ),
-    );
-    checkSessionSettled();
-
-    EventChannelIOS(
+    eventChannelIOS = WC2Client(
       onSessionProposal: (v) {
         onSessionProposal(v);
       },
@@ -79,6 +65,21 @@ class _IosExampleState extends State<IosExample> {
       onFailure: (v) {},
     );
 
+    eventChannelIOS.initialize(
+      peerMeta: PeerMeta(
+        metadataDescription: "wallet description",
+        metadataIcons: [
+          "https://gblobscdn.gitbook.com/spaces%2F-LJJeCjcLrr53DcT1Ml7%2Favatar.png?alt=media"
+        ],
+        metadataName: "Example Wallet",
+        metadataUrl: "example.wallet",
+        projectId: "4af2e046c7a7cbff0a96dc0f594b7e13",
+        relayHost: "relay.walletconnect.com",
+      ),
+    );
+
+    checkSessionSettled();
+
     super.initState();
   }
 
@@ -94,15 +95,15 @@ class _IosExampleState extends State<IosExample> {
   }
 
   checkSessionSettled() async {
-    sessions = await methodChannelIOS.sessionStore();
+    sessions = await eventChannelIOS.sessionStore();
     setState(() {});
     if (sessions != null) {
-      await methodChannelIOS.pair('');
+      await eventChannelIOS.pair('');
     }
   }
 
   reloadSession() async {
-    sessions = await methodChannelIOS.sessionStore();
+    sessions = await eventChannelIOS.sessionStore();
     setState(() {});
   }
 
@@ -148,7 +149,7 @@ class _IosExampleState extends State<IosExample> {
                   subtitle: Text(value['url']),
                   trailing: IconButton(
                       onPressed: () async {
-                        await methodChannelIOS.disconnect(value['topic']);
+                        await eventChannelIOS.disconnect(value['topic']);
                         reloadSession();
                       },
                       icon: Icon(Icons.close)),
@@ -158,7 +159,7 @@ class _IosExampleState extends State<IosExample> {
           ElevatedButton(
             child: const Text('Pair'),
             onPressed: () async {
-              await methodChannelIOS.pair(textEditingController.text);
+              await eventChannelIOS.pair(textEditingController.text);
             },
           ),
           ElevatedButton(
@@ -170,10 +171,9 @@ class _IosExampleState extends State<IosExample> {
           ElevatedButton(
             child: const Text('update'),
             onPressed: () async {
-              var update = await methodChannelIOS.update(
+              var update = await eventChannelIOS.update(
                 topic:
                     '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
-                // account: '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716',
                 account: walletAddress,
                 chains: [
                   "eip155:80001",
@@ -190,7 +190,7 @@ class _IosExampleState extends State<IosExample> {
           ElevatedButton(
             child: const Text('upgrade'),
             onPressed: () async {
-              var upgrade = await methodChannelIOS.upgrade(
+              var upgrade = await eventChannelIOS.upgrade(
                 topic:
                     '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
                 chains: [
@@ -217,7 +217,7 @@ class _IosExampleState extends State<IosExample> {
           ElevatedButton(
             child: const Text('ping'),
             onPressed: () async {
-              sessions = await methodChannelIOS.ping(
+              sessions = await eventChannelIOS.ping(
                 '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
               );
             },
@@ -288,9 +288,9 @@ class _IosExampleState extends State<IosExample> {
                       ElevatedButton(
                         child: const Text('Approve'),
                         onPressed: () async {
-                          // await methodChannelIOS.approve(
+                          // await eventChannelIOS.approve(
                           //     '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716');
-                          await methodChannelIOS.approve(walletAddress);
+                          await eventChannelIOS.approve(walletAddress);
                           reloadSession();
                           Navigator.pop(context);
                         },
@@ -298,7 +298,7 @@ class _IosExampleState extends State<IosExample> {
                       ElevatedButton(
                         child: const Text('Reject'),
                         onPressed: () async {
-                          await methodChannelIOS.reject();
+                          await eventChannelIOS.reject();
                           reloadSession();
                           Navigator.pop(context);
                         },
@@ -345,14 +345,14 @@ class _IosExampleState extends State<IosExample> {
                           signedDataHex =
                               bytesToHex(signedData, include0x: true);
 
-                          await methodChannelIOS.respondRequest(signedDataHex);
+                          await eventChannelIOS.respondRequest(signedDataHex);
                           Navigator.pop(context);
                         },
                       ),
                       ElevatedButton(
                         child: const Text('Reject'),
                         onPressed: () async {
-                          await methodChannelIOS.rejectRequest();
+                          await eventChannelIOS.rejectRequest();
                           Navigator.pop(context);
                         },
                       ),
@@ -397,7 +397,7 @@ class _IosExampleState extends State<IosExample> {
                             chainId: chainId,
                           );
 
-                          await methodChannelIOS.respondRequest(
+                          await eventChannelIOS.respondRequest(
                               bytesToHex(signedDataHex, include0x: true));
                           Navigator.pop(context);
                         },
@@ -405,7 +405,7 @@ class _IosExampleState extends State<IosExample> {
                       ElevatedButton(
                         child: const Text('Reject'),
                         onPressed: () async {
-                          await methodChannelIOS.rejectRequest();
+                          await eventChannelIOS.rejectRequest();
                           Navigator.pop(context);
                         },
                       ),
@@ -451,14 +451,14 @@ class _IosExampleState extends State<IosExample> {
                           signedDataHex =
                               bytesToHex(signedData, include0x: true);
 
-                          await methodChannelIOS.respondRequest(signedDataHex);
+                          await eventChannelIOS.respondRequest(signedDataHex);
                           Navigator.pop(context);
                         },
                       ),
                       ElevatedButton(
                         child: const Text('Reject'),
                         onPressed: () async {
-                          await methodChannelIOS.rejectRequest();
+                          await eventChannelIOS.rejectRequest();
                           Navigator.pop(context);
                         },
                       ),
@@ -503,14 +503,14 @@ class _IosExampleState extends State<IosExample> {
                             version: TypedDataVersion.V4,
                           );
 
-                          await methodChannelIOS.respondRequest(signedDataHex);
+                          await eventChannelIOS.respondRequest(signedDataHex);
                           Navigator.pop(context);
                         },
                       ),
                       ElevatedButton(
                         child: const Text('Reject'),
                         onPressed: () async {
-                          await methodChannelIOS.rejectRequest();
+                          await eventChannelIOS.rejectRequest();
                           Navigator.pop(context);
                         },
                       ),
