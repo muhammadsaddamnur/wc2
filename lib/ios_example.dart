@@ -105,9 +105,16 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('update'),
             onPressed: () async {
               var update = await methodChannelIOS.update(
-                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
+                '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
                 '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716',
-                ["eip155:42", "eip155:80001"],
+                [
+                  "eip155:80001",
+                  "eip155:42",
+                  "eip155:44787",
+                  "solana:8E9rvCKLFQia2Y35HXjjpWzj8weVo44K",
+                  "eip155:69",
+                  "eip155:421611"
+                ],
               );
               print(update);
             },
@@ -116,14 +123,23 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('upgrade'),
             onPressed: () async {
               var upgrade = await methodChannelIOS.upgrade(
-                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
-                ["eip155:42", "eip155:80001"],
+                '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
                 [
-                  "eth_sign",
-                  "personal_sign",
+                  "eip155:80001",
+                  "eip155:42",
+                  "eip155:44787",
+                  "solana:8E9rvCKLFQia2Y35HXjjpWzj8weVo44K",
+                  "eip155:69",
+                  "eip155:421611"
+                ],
+                [
                   "eth_signTransaction",
+                  "solana_signMessage",
+                  "personal_sign",
                   "eth_signTypedData",
-                  "eth_sendTransaction"
+                  "eth_sendTransaction",
+                  "eth_sign",
+                  "solana_signTransaction"
                 ],
               );
               print(upgrade);
@@ -133,7 +149,7 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('ping'),
             onPressed: () async {
               sessions = await methodChannelIOS.ping(
-                '9cd67985857eafc4458de38d37ee5d61621e6d0bdd84e70adf21d4871ba7ee93',
+                '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
               );
             },
           ),
@@ -148,10 +164,10 @@ class _IosExampleState extends State<IosExample> {
       dec = json.decode(event.toString().trim());
       // print(event.toString().trim());
       switch (dec["T"]) {
-        case "onSessionProposal":
+        case "sessionProposal":
           runBSProposal();
           break;
-        case "onSessionRequest":
+        case "sessionRequest":
           runBSRequest();
           break;
         default:

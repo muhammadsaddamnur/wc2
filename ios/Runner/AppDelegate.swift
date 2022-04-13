@@ -7,7 +7,6 @@ import WalletConnectUtils
 /// extend FlutterStreamHandler
 @objc class AppDelegate: FlutterAppDelegate, WalletConnectClientDelegate,  FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
-    //    var sessionItems: [ActiveSessionItem] = []
     var currentProposal: Session.Proposal?
     var currentRequest: Request?
     
@@ -37,49 +36,52 @@ import WalletConnectUtils
     private func prepareMethodHandler(methodChannel: FlutterMethodChannel) {
         methodChannel.setMethodCallHandler({
             (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+           
             if call.method == "initialize" {
                 let args = call.arguments as! Dictionary<String, Any>
-                
                 self.metadataName = args["metadataName"] as? String
                 self.metadataDescription = args["metadataDescription"] as? String
                 self.metadataUrl = args["metadataUrl"] as? String
                 self.metadataIcons = args["metadataIcons"] as? Array<String>
                 self.projectId = args["projectId"] as? String
                 self.relayHost = args["relayHost"] as? String
-                
                 self.initalize(result: result)
+                
             } else if call.method == "pair" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let uri = args["uri"] as! String
                 self.pair(result: result, uri: uri)
+                
             } else if call.method == "approve" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let account = args["account"] as! String
                 self.approve(result: result, currentProposal: self.currentProposal!, account: account)
+                
             } else if call.method == "reject" {
                 self.reject(result: result,currentProposal: self.currentProposal!)
             } else if call.method == "disconnect" {
-                //sementara selagi blm ditentuin mau multi session apa engga
-                //                let settledSessions = self.client!.getSettledSessions()
-                //                self.disconnect(result: result, topic: settledSessions.first!.topic)
-                
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
                 self.disconnect(result: result, topic: topic)
+                
             } else if call.method == "respondRequest" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let sign = args["sign"] as! String
                 self.respondRequest(result: result, sign: sign)
+                
             } else if call.method == "rejectRequest" {
                 self.rejectRequest(result: result)
+                
             } else if call.method == "reloadSessions" {
                 self.reloadSessions(result: result)
+                
             } else if call.method == "update" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let account = args["account"] as! String
                 let topic = args["topic"] as! String
                 let chains = Set<String>(args["chains"] as! Array)
                 self.update(result: result, chains: chains,topic: topic,  account: account)
+                
             } else if call.method == "upgrade" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
@@ -87,10 +89,12 @@ import WalletConnectUtils
                 let methods = Set<String>(args["methods"] as! Array)
                 let notifications = args["notifications"] as! Array<String> 
                 self.upgrade(result: result, chains: chains, methods: methods,notifications: notifications ,topic: topic)
+                
             } else if call.method == "ping" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
                 self.ping(result: result, topic: topic)
+                
             }
             else {
                 result(FlutterMethodNotImplemented)
@@ -100,54 +104,18 @@ import WalletConnectUtils
         })
     }
     
-    /// reload ketika pertama dibuka
-    //    private func getActiveSessionItem(for settledSessions: [Session]) -> [ActiveSessionItem] {
-    //        return settledSessions.map { session -> ActiveSessionItem in
-    //            let app = session.peer
-    //            return ActiveSessionItem(
-    //                dappName: app.name ?? "",
-    //                dappURL: app.url ?? "",
-    //                iconURL: app.icons?.first ?? "",
-    //                topic: session.topic)
-    //        }
-    //    }
-    //
-    //    private func reloadActiveSessions() {
-    //        let settledSessions = client!.getSettledSessions()
-    //        let activeSessions = getActiveSessionItem(for: settledSessions)
-    //        self.sessionItems = activeSessions
-    //    }
     
-    /// reload tampil di ui
+    /// method channel
     private func getActiveSessionString(for settledSessions: [Session]) -> [String] {
         return settledSessions.map { session -> String in
-            let appMetadata = session.peer
-            return """
-                {
-                    "T" : "onSessionProposal",
-                    "value": {
-                        "accounts": [],
-                        "chains":  \(session.permissions.blockchains),
-                        "description":  "\((appMetadata.description ?? ""))",
-                        "icons" : \(appMetadata.icons ?? []),
-                        "isController":  "",
-                        "methods":  \(session.permissions.methods),
-                        "name":  "\(appMetadata.name ?? "")",
-                        "proposerPublicKey":  "",
-                        "relayProtocol":  "",
-                        "topic": "\(session.topic)",
-                        "ttl":  "",
-                        "url": "\(appMetadata.url ?? "")"
-                    }
-                }
-            """
+              sessionResponse(T: "reloadSession", session: session)
         }
     }
     
+    /// method channel
     private func reloadSessions(result: FlutterResult) {
         let settledSessions = client!.getSettledSessions()
         let activeSessions = getActiveSessionString(for: settledSessions)
-        //        self.sessionItems = activeSessions
         result("\(activeSessions)")
     }
     
@@ -176,14 +144,12 @@ import WalletConnectUtils
     
     /// method channel
     func pair(result: FlutterResult, uri:String){
-        print("[RESPONDER] Pairing to: \(uri)")
         do {
             client!.delegate = self
             try client!.pair(uri: uri)
-            print("oke")
             result(uri)
         } catch {
-            print("[PROPOSER] Pairing connect error: \(error)")
+            result("[PROPOSER] Pairing connect error: \(error)")
         }
     }
     
@@ -214,7 +180,6 @@ import WalletConnectUtils
     func respondRequest(result: FlutterResult, sign: String){
         let response = JSONRPCResponse<AnyCodable>(id: currentRequest!.id, result: AnyCodable(sign))
         client!.respond(topic: currentRequest!.topic, response: .response(response))
-        print("oke")
         result("respondRequest")
     }
     
@@ -222,8 +187,6 @@ import WalletConnectUtils
     func rejectRequest(result: FlutterResult){
         let response = JSONRPCErrorResponse(id: currentRequest!.id, error: JSONRPCErrorResponse.Error(code: 0, message: ""))
         client!.respond(topic: currentRequest!.topic, response: .error(response))
-        
-        print("oke")
         result("rejectRequest")
     }
     
@@ -255,6 +218,7 @@ import WalletConnectUtils
         })
     }
     
+    /// method channel
     func update(result: FlutterResult, chains: Set<String>, topic: String, account: String){
         let accounts = Set(chains.compactMap{ Account($0+":\(account)") })
         do {
@@ -265,6 +229,7 @@ import WalletConnectUtils
         result("update")
     }
     
+    /// method channel
     func upgrade(result: FlutterResult, chains: Set<String>, methods: Set<String>, notifications: [String], topic: String){
         let permission =  Session.Permissions(blockchains: chains, methods: methods, notifications: notifications)
         do {
@@ -275,49 +240,68 @@ import WalletConnectUtils
         result("upgrade")
     }
     
+    
+    func sessionResponse(T: String, session: Session) -> String{
+        let appMetadata = session.peer
+        return """
+                {
+                    "T" : "\(T)",
+                    "value": {
+                        "accounts": [],
+                        "chains":  \(session.permissions.blockchains),
+                        "description":  "\((appMetadata.description ?? ""))",
+                        "icons" : \(appMetadata.icons ?? []),
+                        "isController":  "",
+                        "methods":  \(session.permissions.methods),
+                        "name":  "\(appMetadata.name ?? "")",
+                        "proposerPublicKey":  "",
+                        "relayProtocol":  "",
+                        "topic": "\(session.topic)",
+                        "ttl":  "",
+                        "url": "\(appMetadata.url ?? "")"
+                    }
+                }
+            """
+    }
+    
     /// ===================================================================
     
     /// event channel
     func onListen(withArguments arguments: Any?,
                   eventSink: @escaping FlutterEventSink) -> FlutterError? {
-        print("On Listen Call")
         self.eventSink = eventSink
-        //        eventSink("wkwkaskdoaksdoko")
         return nil
     }
     
     /// event channel
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        debugPrint("On cancel Call")
         self.eventSink = nil
         return nil
     }
     
     /// event channel
     func didSettle(session: Session) {
-        print("ini settle")
-        //        reloadActiveSessions()
-        print(session)
+        self.eventSink!(sessionResponse(T: "settle", session: session))
+    }
+    
+    /// event channel
+    func didDelete(sessionTopic: String, reason: Reason) {
         self.eventSink!("""
              {
-                "T" : "settle",
+                "T" : "delete",
                 "value": {
-                     "session" : "\(session)"
+                     "topic" : "\(sessionTopic)",
+                     "reason" : {
+                        "code" : "\(reason.code)",
+                        "message" : "\(reason.message)"
+                     }
                 }
              }
             """)
     }
     
-    
-    /// event channel
-    func didDelete(sessionTopic: String, reason: Reason) {
-        print(sessionTopic)
-        //        self.eventSink!("ondelete")
-    }
-    
     /// event channel
     func didUpdate(sessionTopic: String, accounts: Set<Account>) {
-        print(sessionTopic)
         let accountsArray = accounts.compactMap { "\($0)" }
         
         self.eventSink!("""
@@ -334,7 +318,6 @@ import WalletConnectUtils
     
     /// event channel
     func didUpgrade(sessionTopic: String, permissions: Session.Permissions) {
-        print(sessionTopic)
         self.eventSink!("""
              {
                 "T" : "upgrade",
@@ -349,14 +332,10 @@ import WalletConnectUtils
     
     /// event channel
     func didReceive(sessionProposal: Session.Proposal) {
-        print("sessionProposal===========>")
-        print(sessionProposal)
-        print("<===========")
-        
         let appMetadata = sessionProposal.proposer
         self.eventSink!("""
             {
-                "T" : "onSessionProposal",
+                "T" : "sessionProposal",
                 "value": {
                     "accounts": [],
                     "chains":  \(sessionProposal.permissions.blockchains),
@@ -378,17 +357,9 @@ import WalletConnectUtils
     
     /// event channel
     func didReceive(sessionRequest: Request) {
-        print("request =================>")
-        print(sessionRequest)
-        
-        print("request===========>")
-        print(sessionRequest)
-        print("<===========")
-        
-        
         self.eventSink!("""
             {
-                "T" : "onSessionRequest",
+                "T" : "sessionRequest",
                 "value": {
                     "chainId":  "\(sessionRequest.chainId ?? "")",
                     "topic":  "\((sessionRequest.topic))",
@@ -405,16 +376,17 @@ import WalletConnectUtils
     
     /// event channel
     func didReject(pendingSessionTopic: String, reason: Reason) {
-        print(reason)
+        self.eventSink!("""
+             {
+                "T" : "reject",
+                "value": {
+                     "pendingSessionTopic" : "\(pendingSessionTopic)",
+                      "reason" : {
+                         "code" : "\(reason.code)",
+                         "message" : "\(reason.message)"
+                      }
+                }
+             }
+            """)
     }
 }
-
-//
-//
-//struct ActiveSessionItem {
-//    let dappName: String
-//    let dappURL: String
-//    let iconURL: String
-//    let topic: String
-//}
-//
