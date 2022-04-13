@@ -1,8 +1,17 @@
 import 'dart:convert';
 
+import 'package:eth_sig_util/eth_sig_util.dart';
 import 'package:flutter/material.dart';
+import 'package:wallet_connect_v2_flutter/event_channel_ios.dart';
+import 'package:wallet_connect_v2_flutter/models/peer_meta.dart';
+import 'package:wallet_connect_v2_flutter/models/session_proposal.dart';
+import 'package:wallet_connect_v2_flutter/models/session_request.dart';
+import 'package:web3dart/crypto.dart';
+import 'package:web3dart/web3dart.dart';
+import 'package:http/http.dart' as http;
 
 import 'method_channel_ios.dart';
+import 'models/sign/WCEthereumTransaction.dart';
 
 class IosExample extends StatefulWidget {
   const IosExample({Key? key}) : super(key: key);
@@ -18,30 +27,101 @@ class _IosExampleState extends State<IosExample> {
 
   bool isBottomSheet = false;
 
-  dynamic dec;
-
   List? sessions;
+
+  final _web3client = Web3Client(
+    // 'https://rpc-mainnet.maticvigil.com/v1/140d92ff81094f0f3d7babde06603390d7e581be',
+    'https://kovan.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161',
+    http.Client(),
+  );
+  String privateKey =
+      'eb3b5c1dcaee30f5d060440e72665f49e00f6d3078075c827d7c0f46a9e366c2';
+
+  String walletAddress = '';
 
   @override
   void initState() {
-    methodChannelIOS.initialize();
+    createWalletAddress();
+
+    methodChannelIOS.initialize(
+      PeerMeta(
+        metadataDescription: "wallet description",
+        metadataIcons: [
+          "https://gblobscdn.gitbook.com/spaces%2F-LJJeCjcLrr53DcT1Ml7%2Favatar.png?alt=media"
+        ],
+        metadataName: "Example Wallet",
+        metadataUrl: "example.wallet",
+        projectId: "4af2e046c7a7cbff0a96dc0f594b7e13",
+        relayHost: "relay.walletconnect.com",
+      ),
+    );
     checkSessionSettled();
-    methodChannelIOS.eventChannel.receiveBroadcastStream().listen(_onEvent);
+
+    EventChannelIOS(
+      onSessionProposal: (v) {
+        onSessionProposal(v);
+      },
+      onDelete: (v) {
+        reloadSession();
+      },
+      onEthSignTransaction: (chainId, tx) async {
+        onEthSignTransaction(chainId, tx);
+      },
+      onPersonalSign: (message) {
+        onPersonalSigning(message);
+      },
+      onEthSign: (message) {
+        onEthSign(message);
+      },
+      onEthSignTypedData: (message) {
+        onEthSignTypedData(message);
+      },
+      onFailure: (v) {},
+    );
 
     super.initState();
   }
 
+  createWalletAddress() async {
+    /// create credential wallet from private key
+    Credentials credentials = EthPrivateKey.fromHex(privateKey);
+
+    /// create address wallet from credentials
+    var address = await credentials.extractAddress();
+
+    /// set wallet address
+    walletAddress = address.hex;
+  }
+
   checkSessionSettled() async {
-    sessions = await methodChannelIOS.reloadActiveSessions();
+    sessions = await methodChannelIOS.sessionStore();
     setState(() {});
     if (sessions != null) {
-      await methodChannelIOS.pair('', () {}, () {});
+      await methodChannelIOS.pair('');
     }
   }
 
   reloadSession() async {
-    sessions = await methodChannelIOS.reloadActiveSessions();
+    sessions = await methodChannelIOS.sessionStore();
     setState(() {});
+  }
+
+  Transaction _wcEthTxToWeb3Tx(WCEthereumTransaction ethereumTransaction) {
+    return Transaction(
+      from: EthereumAddress.fromHex(ethereumTransaction.from),
+      to: EthereumAddress.fromHex(ethereumTransaction.to),
+      maxGas: ethereumTransaction.gasLimit != null
+          ? int.tryParse(ethereumTransaction.gasLimit!)
+          : null,
+      gasPrice: ethereumTransaction.gasPrice != null
+          ? EtherAmount.inWei(BigInt.parse(ethereumTransaction.gasPrice!))
+          : null,
+      value: EtherAmount.inWei(BigInt.parse(ethereumTransaction.value ?? '0')),
+      data: hexToBytes(ethereumTransaction.data),
+      nonce: ethereumTransaction.nonce != null
+          ? int.tryParse(ethereumTransaction.nonce!)
+          : null,
+    );
   }
 
   @override
@@ -49,12 +129,6 @@ class _IosExampleState extends State<IosExample> {
     return Scaffold(
       body: ListView(
         children: [
-          // ElevatedButton(
-          //   onPressed: () {
-          //     methodChannelIOS.test();
-          //   },
-          //   child: Text('wkwk'),
-          // ),
           TextField(
             controller: textEditingController,
           ),
@@ -65,7 +139,7 @@ class _IosExampleState extends State<IosExample> {
           if (sessions != null)
             ListView(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               children: sessions!.map((e) {
                 var value = json.decode(e)['value'];
                 return ListTile(
@@ -84,17 +158,9 @@ class _IosExampleState extends State<IosExample> {
           ElevatedButton(
             child: const Text('Pair'),
             onPressed: () async {
-              await methodChannelIOS.pair(
-                  textEditingController.text, () {}, () {});
+              await methodChannelIOS.pair(textEditingController.text);
             },
           ),
-
-          // ElevatedButton(
-          //   child: const Text('Disconnect'),
-          //   onPressed: () async {
-          //     await methodChannelIOS.disconnect();
-          //   },
-          // ),
           ElevatedButton(
             child: const Text('reloadSessions'),
             onPressed: () async {
@@ -105,9 +171,11 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('update'),
             onPressed: () async {
               var update = await methodChannelIOS.update(
-                '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
-                '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716',
-                [
+                topic:
+                    '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
+                // account: '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716',
+                account: walletAddress,
+                chains: [
                   "eip155:80001",
                   "eip155:42",
                   "eip155:44787",
@@ -123,8 +191,9 @@ class _IosExampleState extends State<IosExample> {
             child: const Text('upgrade'),
             onPressed: () async {
               var upgrade = await methodChannelIOS.upgrade(
-                '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
-                [
+                topic:
+                    '764936a660195446d92bc300bcee9a512b903b87335978f591b787df89c6dd60',
+                chains: [
                   "eip155:80001",
                   "eip155:42",
                   "eip155:44787",
@@ -132,7 +201,7 @@ class _IosExampleState extends State<IosExample> {
                   "eip155:69",
                   "eip155:421611"
                 ],
-                [
+                methods: [
                   "eth_signTransaction",
                   "solana_signMessage",
                   "personal_sign",
@@ -158,25 +227,7 @@ class _IosExampleState extends State<IosExample> {
     );
   }
 
-  void _onEvent(event) {
-    if (event != null) {
-      print(event);
-      dec = json.decode(event.toString().trim());
-      // print(event.toString().trim());
-      switch (dec["T"]) {
-        case "sessionProposal":
-          runBSProposal();
-          break;
-        case "sessionRequest":
-          runBSRequest();
-          break;
-        default:
-      }
-      print("wk" + dec['T'].toString());
-    }
-  }
-
-  void runBSProposal() {
+  void onSessionProposal(SessionProposal value) {
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
@@ -193,7 +244,7 @@ class _IosExampleState extends State<IosExample> {
                   Row(
                     children: [
                       CircleAvatar(
-                        child: Image.network(dec['value']['icons'][0]),
+                        child: Image.network(value.value!.icons!.first ?? ''),
                       ),
                       SizedBox(
                         width: 5,
@@ -201,9 +252,9 @@ class _IosExampleState extends State<IosExample> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(dec['value']['name']),
+                          Text(value.value!.name ?? ''),
                           Text(
-                            dec['value']['url'],
+                            value.value!.url ?? '',
                           )
                         ],
                       )
@@ -214,21 +265,21 @@ class _IosExampleState extends State<IosExample> {
                     'Blockchain(s)',
                   ),
                   Text(
-                    dec['value']['chains'][0],
+                    value.value!.chains.toString(),
                   ),
                   Divider(),
                   Text(
                     'Relay Protocol',
                   ),
                   Text(
-                    dec['value']['relayProtocol'],
+                    value.value!.relayProtocol ?? '',
                   ),
                   Divider(),
                   Text(
                     'Method',
                   ),
                   Text(
-                    dec['value']['methods'].toString(),
+                    value.value!.methods.toString(),
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -237,8 +288,9 @@ class _IosExampleState extends State<IosExample> {
                       ElevatedButton(
                         child: const Text('Approve'),
                         onPressed: () async {
-                          await methodChannelIOS.approve(
-                              '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716');
+                          // await methodChannelIOS.approve(
+                          //     '0x022c0c42a80bd19EA4cF0F94c4F9F96645759716');
+                          await methodChannelIOS.approve(walletAddress);
                           reloadSession();
                           Navigator.pop(context);
                         },
@@ -262,60 +314,21 @@ class _IosExampleState extends State<IosExample> {
     );
   }
 
-  void runBSRequest() {
+  onPersonalSigning(String message) {
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
       builder: (BuildContext context) {
-        return Container(
+        return SizedBox(
           height: MediaQuery.of(context).size.height,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: ListView(children: [
-              Text('Session Request'),
+              const Text('Personal Signing'),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row(
-                  //   children: [
-                  //     CircleAvatar(
-                  //       child: Image.network(dec['value']['icons'][0]),
-                  //     ),
-                  //     SizedBox(
-                  //       width: 5,
-                  //     ),
-                  //     Column(
-                  //       crossAxisAlignment: CrossAxisAlignment.start,
-                  //       children: [
-                  //         Text(dec['value']['name']),
-                  //         Text(
-                  //           dec['value']['url'],
-                  //         )
-                  //       ],
-                  //     )
-                  //   ],
-                  // ),
-                  // Divider(),
-                  // Text(
-                  //   'Blockchain(s)',
-                  // ),
-                  // Text(
-                  //   dec['value']['chains'][0],
-                  // ),
-                  // Divider(),
-                  // Text(
-                  //   'Relay Protocol',
-                  // ),
-                  // Text(
-                  //   dec['value']['relayProtocol'],
-                  // ),
-                  // Divider(),
-                  // Text(
-                  //   'Method',
-                  // ),
-                  // Text(
-                  //   dec['value']['methods'].toString(),
-                  // ),
+                  Text(String.fromCharCodes(hexToBytes(message))),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.max,
@@ -323,8 +336,174 @@ class _IosExampleState extends State<IosExample> {
                       ElevatedButton(
                         child: const Text('Approve'),
                         onPressed: () async {
+                          String signedDataHex = '';
+
+                          final creds = EthPrivateKey.fromHex(privateKey);
+                          final encodedMessage = hexToBytes(message);
+                          final signedData =
+                              await creds.signPersonalMessage(encodedMessage);
+                          signedDataHex =
+                              bytesToHex(signedData, include0x: true);
+
+                          await methodChannelIOS.respondRequest(signedDataHex);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ElevatedButton(
+                        child: const Text('Reject'),
+                        onPressed: () async {
+                          await methodChannelIOS.rejectRequest();
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  onEthSignTransaction(int chainId, WCEthereumTransaction tx) {
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ListView(children: [
+              const Text('EthSignTransaction'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text(String.fromCharCodes(hexToBytes(message))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      ElevatedButton(
+                        child: const Text('Approve'),
+                        onPressed: () async {
+                          final creds = EthPrivateKey.fromHex(privateKey);
+                          final signedDataHex =
+                              await _web3client.signTransaction(
+                            creds,
+                            _wcEthTxToWeb3Tx(tx),
+                            chainId: chainId,
+                          );
+
                           await methodChannelIOS.respondRequest(
-                              '0xa3f20717a250c2b0b729b7e5becbff67fdaef7e0699da4de7ca5895b02a170a12d887fd3b17bfdce3481f10bea41f45ba9f709d39ce8325427b57afcfc994cee1b');
+                              bytesToHex(signedDataHex, include0x: true));
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ElevatedButton(
+                        child: const Text('Reject'),
+                        onPressed: () async {
+                          await methodChannelIOS.rejectRequest();
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  onEthSign(String message) {
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ListView(children: [
+              const Text('EthSignTransaction'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text(String.fromCharCodes(hexToBytes(message))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      ElevatedButton(
+                        child: const Text('Approve'),
+                        onPressed: () async {
+                          String signedDataHex = '';
+
+                          final creds = EthPrivateKey.fromHex(privateKey);
+                          final encodedMessage = hexToBytes(message);
+                          final signedData =
+                              await creds.signPersonalMessage(encodedMessage);
+                          signedDataHex =
+                              bytesToHex(signedData, include0x: true);
+
+                          await methodChannelIOS.respondRequest(signedDataHex);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ElevatedButton(
+                        child: const Text('Reject'),
+                        onPressed: () async {
+                          await methodChannelIOS.rejectRequest();
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  onEthSignTypedData(String message) {
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ListView(children: [
+              const Text('EthSignTransaction'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text(String.fromCharCodes(hexToBytes(message))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      ElevatedButton(
+                        child: const Text('Approve'),
+                        onPressed: () async {
+                          String signedDataHex = '';
+
+                          signedDataHex = EthSigUtil.signTypedData(
+                            privateKey: privateKey,
+                            jsonData: message,
+                            version: TypedDataVersion.V4,
+                          );
+
+                          await methodChannelIOS.respondRequest(signedDataHex);
                           Navigator.pop(context);
                         },
                       ),

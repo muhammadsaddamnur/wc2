@@ -23,8 +23,8 @@ import WalletConnectUtils
         
         
         /// ini event channel
-        let EventChannel1 = FlutterEventChannel(name: "stream1",binaryMessenger: controller.binaryMessenger)
-        EventChannel1.setStreamHandler(self)
+        let EventChannel = FlutterEventChannel(name: "stream_wallet_connect_2",binaryMessenger: controller.binaryMessenger)
+        EventChannel.setStreamHandler(self)
         
         
         GeneratedPluginRegistrant.register(with: self)
@@ -59,6 +59,7 @@ import WalletConnectUtils
                 
             } else if call.method == "reject" {
                 self.reject(result: result,currentProposal: self.currentProposal!)
+                
             } else if call.method == "disconnect" {
                 let args = call.arguments as! Dictionary<String, Any>
                 let topic = args["topic"] as! String
@@ -72,8 +73,8 @@ import WalletConnectUtils
             } else if call.method == "rejectRequest" {
                 self.rejectRequest(result: result)
                 
-            } else if call.method == "reloadSessions" {
-                self.reloadSessions(result: result)
+            } else if call.method == "sessionStore" {
+                self.sessionStore(result: result)
                 
             } else if call.method == "update" {
                 let args = call.arguments as! Dictionary<String, Any>
@@ -108,12 +109,12 @@ import WalletConnectUtils
     /// method channel
     private func getActiveSessionString(for settledSessions: [Session]) -> [String] {
         return settledSessions.map { session -> String in
-              sessionResponse(T: "reloadSession", session: session)
+              sessionResponse(T: "sessionStore", session: session)
         }
     }
     
     /// method channel
-    private func reloadSessions(result: FlutterResult) {
+    private func sessionStore(result: FlutterResult) {
         let settledSessions = client!.getSettledSessions()
         let activeSessions = getActiveSessionString(for: settledSessions)
         result("\(activeSessions)")
@@ -158,21 +159,18 @@ import WalletConnectUtils
     func approve(result: FlutterResult, currentProposal: Session.Proposal, account: String){
         let accounts = Set(currentProposal.permissions.blockchains.compactMap{ Account($0+":\(account)") })
         client!.approve(proposal: currentProposal, accounts: accounts)
-        print("oke")
         result("approve")
     }
     
     /// method channel
     func reject(result: FlutterResult, currentProposal: Session.Proposal){
         client!.reject(proposal: currentProposal, reason: .disapprovedChains)
-        print("oke")
         result("reject")
     }
     
     /// method channel
     func disconnect(result: FlutterResult, topic: String){
         client!.disconnect(topic: topic, reason: Reason(code: 0, message: "disconnect"))
-        print("oke")
         result("disconnect")
     }
     
@@ -185,12 +183,12 @@ import WalletConnectUtils
     
     /// method channel
     func rejectRequest(result: FlutterResult){
-        let response = JSONRPCErrorResponse(id: currentRequest!.id, error: JSONRPCErrorResponse.Error(code: 0, message: ""))
+        let response = JSONRPCErrorResponse(id: currentRequest!.id, error: JSONRPCErrorResponse.Error(code: 0, message: "User rejected the request."))
         client!.respond(topic: currentRequest!.topic, response: .error(response))
         result("rejectRequest")
     }
     
-    
+    /// event channel
     func ping(result: FlutterResult, topic: String){
         client!.ping(topic: topic, completion: { value in
             switch value {
@@ -240,7 +238,7 @@ import WalletConnectUtils
         result("upgrade")
     }
     
-    
+    /// helper
     func sessionResponse(T: String, session: Session) -> String{
         let appMetadata = session.peer
         return """
@@ -282,7 +280,9 @@ import WalletConnectUtils
     /// event channel
     func didSettle(session: Session) {
         self.eventSink!(sessionResponse(T: "settle", session: session))
+
     }
+    
     
     /// event channel
     func didDelete(sessionTopic: String, reason: Reason) {
