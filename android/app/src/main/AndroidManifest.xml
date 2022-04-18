@@ -6,8 +6,14 @@
         android:label="wallet_connect_v2_flutter"
         android:name="com.example.wallet_connect_v2_flutter.SampleApplication"
         android:icon="@mipmap/ic_launcher"
-        tools:ignore="Instantiatable">
+    tools:ignore="Instantiatable">
+<!--    <application-->
+<!--        android:label="wallet_connect_v2_flutter"-->
+<!--        android:name="${applicationName}"-->
+<!--        android:icon="@mipmap/ic_launcher"-->
+<!--        tools:ignore="Instantiatable">-->
         <!--        android:name="${applicationName}"-->
+        <!--        android:name="com.example.wallet_connect_v2_flutter.SampleApplication"-->
 
         <activity
             android:name=".MainActivity"

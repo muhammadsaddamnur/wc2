@@ -1,16 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:eth_sig_util/eth_sig_util.dart';
 import 'package:flutter/material.dart';
 import 'package:wallet_connect_v2_flutter/wc2_client.dart';
 import 'package:wallet_connect_v2_flutter/models/peer_meta.dart';
 import 'package:wallet_connect_v2_flutter/models/session_proposal.dart';
-import 'package:wallet_connect_v2_flutter/models/session_request.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
-
-import 'method_channel_ios.dart';
 import 'models/sign/WCEthereumTransaction.dart';
 
 class IosExample extends StatefulWidget {
@@ -78,6 +76,7 @@ class _IosExampleState extends State<IosExample> {
       ),
     );
 
+    print('wkwk');
     checkSessionSettled();
 
     super.initState();
@@ -97,9 +96,9 @@ class _IosExampleState extends State<IosExample> {
   checkSessionSettled() async {
     sessions = await eventChannelIOS.sessionStore();
     setState(() {});
-    if (sessions != null) {
-      await eventChannelIOS.pair('');
-    }
+    // if (sessions != null) {
+    //   await eventChannelIOS.pair('');
+    // }
   }
 
   reloadSession() async {
@@ -142,7 +141,12 @@ class _IosExampleState extends State<IosExample> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: sessions!.map((e) {
-                var value = json.decode(e)['value'];
+                var value;
+                //ios
+                if (Platform.isIOS) value = json.decode(e)['value'];
+                //android
+                if (Platform.isAndroid) value = e['value'];
+
                 return ListTile(
                   leading: Image.network(value['icons'][0], width: 30),
                   title: Text(value['name']),
@@ -156,10 +160,34 @@ class _IosExampleState extends State<IosExample> {
                 );
               }).toList(),
             ),
+          // StreamBuilder(
+          //   stream: eventChannelIOS.streamDelegate().asBroadcastStream(),
+          //   builder: (context, snapshot) {
+          //     if (snapshot.hasData) {
+          //       // stream();
+          //       var dec = json.decode(snapshot.data.toString());
+          //       // if (dec['T'] == "onSessionRequest") {
+          //       //   switch (dec['value']['request']['method']) {
+          //       //     case :
+
+          //       //       break;
+          //       //     default:
+          //       //   }
+          //       // }
+          //       return Column(
+          //         children: [
+          //           Text(dec.toString()),
+          //         ],
+          //       );
+          //     }
+          //     return const SizedBox();
+          //   },
+          // ),
           ElevatedButton(
             child: const Text('Pair'),
             onPressed: () async {
               await eventChannelIOS.pair(textEditingController.text);
+              // eventChannelIOS.delegate();
             },
           ),
           ElevatedButton(

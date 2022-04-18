@@ -1,5 +1,6 @@
 package com.example.wallet_connect_v2_flutter
 
+import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -9,6 +10,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.*
 
@@ -25,13 +27,58 @@ private fun resultOnSuccess(res : Map<String, Any?>) : String {
     return JSONObject(result).toString()
 }
 
+private fun sessionResponse(T: String, session: WalletConnect.Model.SettledSession) : String{
+    val appMetadata = session.peerAppMetaData
+
+    val result: Map<String, Any?> =
+        mapOf(
+            "T" to T,
+            "value" to mapOf (
+                "accounts" to session.accounts,
+                "chains" to  session.permissions.blockchain.chains,
+                "description" to (appMetadata?.description ?: ""),
+                "icons" to (appMetadata?.icons ?: listOf()),
+                "isController" to  "",
+                "methods" to  session.permissions.jsonRpc.methods,
+                "name" to (appMetadata?.name ?: ""),
+                "proposerPublicKey" to  "",
+                "relayProtocol" to  "",
+                "topic" to session.topic,
+                "ttl" to  "",
+                "url" to (appMetadata?.url ?: "")
+            )
+        )
+
+    return JSONObject(result).toString()
+
+//   return """
+//       {
+//            "T" : "$T",
+//            "value" : {
+//                "accounts" : ${session.accounts},
+//                "chains" : ${session.permissions.blockchain.chains},
+//                "description" : ${appMetadata?.description ?: ""},
+//                "icons" : ${appMetadata?.icons ?: listOf()},
+//                "isController" : "",
+//                "methods" : ${session.permissions.jsonRpc.methods},
+//                "name" : ${appMetadata?.name ?: ""},
+//                "proposerPublicKey" : "",
+//                "relayProtocol" : "",
+//                "topic" : ${session.topic},
+//                "ttl" : "",
+//                "url" : ${appMetadata?.url ?: ""}
+//            }
+//        }
+//   """
+}
+
 private lateinit var messager :  io.flutter.plugin.common.BinaryMessenger
 
 private lateinit var sPairing: WalletConnect.Model.SettledPairing
 
-private lateinit var sProposal: WalletConnect.Model.SessionProposal
+private lateinit var currentProposal: WalletConnect.Model.SessionProposal
 
-private lateinit var  sRequest: WalletConnect.Model.SessionRequest
+private lateinit var  currentRequest: WalletConnect.Model.SessionRequest
 
 private lateinit var rSession: WalletConnect.Model.RejectedSession
 
@@ -55,32 +102,69 @@ class MainActivity: FlutterActivity() {
         MethodChannel(messager, CHANNEL).setMethodCallHandler {
                 call, result ->
             when(call.method){
+                "initialize" -> {
+                    this.metadataName = call.argument<String>("metadataName")
+                    this.metadataDescription = call.argument<String>("metadataDescription")
+                    this.metadataUrl = call.argument<String>("metadataUrl")
+                    this.metadataIcons = call.argument<List<String>>("metadataIcons")
+                    this.projectId = call.argument<String>("projectId")
+                    this.relayHost = call.argument<String>("relayHost")
+                    initialize(result)
+                }
+
+                "delegate"-> {
+                    delegate()
+                }
+
                 "pair"-> {
-                    val uri = call.argument<String>("uri");
-                    pair(uri.toString())
+                    val uri = call.argument<String>("uri")
+                    pair(result, uri.toString())
                 }
-                "delegate" -> delegate()
-                "disconnect" -> disconnect()
+
                 "approve" -> {
-                    val accounts = call.argument<List<String>>("accounts")
-                    approve(accounts!!)
+                    val account = call.argument<String>("account")
+                    approve(account!!)
                 }
+
                 "reject" -> reject()
+
+                "disconnect" -> {
+                    val topic = call.argument<String>("topic")
+                    disconnect(topic!!)
+                }
+
                 "respondRequest" -> {
                     val sign = call.argument<String>("sign")
                     respondRequest(sign!!)
                 }
+
                 "rejectRequest" -> rejectRequest()
-                "sessionUpdate" -> {
-                    val accounts = call.argument<List<String>>("accounts")
-                    sessionUpdate(accounts!!)
-                }
-                "sessionUpgrade" -> {
+
+                "sessionStore" -> sessionStore(result)
+
+                "update" -> {
+                    val account = call.argument<String>("account")
+                    val topic = call.argument<String>("topic")
                     val chains = call.argument<List<String>>("chains")
-                    val jsonrpc = call.argument<List<String>>("jsonrpc")
-                    sessionUpgrade(chains!!, jsonrpc!!)
+
+                    update(chains!!, topic!!, account!!)
                 }
-                "sessionPing" -> sessionPing(result)
+
+                "upgrade" -> {
+                    val topic = call.argument<String>("topic")
+                    val chains = call.argument<List<String>>("chains")
+                    val methods = call.argument<List<String>>("methods")
+                    val notifications = call.argument<List<String>>("notifications")
+
+                    upgrade(chains!!,methods!!, notifications!!, topic!!)
+                }
+
+                "ping" -> {
+                    val topic = call.argument<String>("topic")
+                    ping(result, topic!!)
+                }
+
+
                 else -> result.notImplemented()
             }
         }
@@ -95,56 +179,96 @@ class MainActivity: FlutterActivity() {
         EventChannel(messager, "streamSessionUpdate").setStreamHandler(StreamSessionUpdate)
         EventChannel(messager, "streamSessionUpgrade").setStreamHandler(StreamSessionUpgrade)
         EventChannel(messager, "streamSessionPing").setStreamHandler(StreamSessionPing)
+    }
 
+    /// method channel
+    private fun getActiveSessionString(settledSessions: List<WalletConnect.Model.SettledSession>) : List<String> {
+        return settledSessions.map { session ->
+                sessionResponse(T= "reloadSession", session= session)
+        }
+    }
+    private fun sessionStore(result: MethodChannel.Result){
+        val settledSessions =  WalletConnectClient.getListOfSettledSessions()
+        result.success(getActiveSessionString(settledSessions).toString())
+    }
 
-
+    /// method channel
+    var client: WalletConnectClient = WalletConnectClient
+    var metadataName: String? = null
+    var metadataDescription: String? = null
+    var metadataUrl: String? = null
+    var metadataIcons: List<String>? = null
+    var projectId: String? = null
+    var relayHost: String? = null
+    private fun initialize(result: MethodChannel.Result,){
+//        val initWallet = WalletConnect.Params.Init(
+//            application = this.application,
+//            relayServerUrl = "wss://${this.relayHost!!}?projectId=${this.projectId!!}",
+//            isController = true,
+//            metadata = WalletConnect.Model.AppMetaData(
+//                name = this.metadataName!!,
+//                description = this.metadataDescription!!,
+//                url = this.metadataUrl!!,
+//                icons = this.metadataIcons!!
+//            )
+//        )
+//
+//        WalletConnectClient.initialize(initWallet)
+//        client = WalletConnectClient
+        result.success("init")
     }
 
 
-    private fun pair(uri:String){
+    /// method channel
+    private fun pair(result: MethodChannel.Result, uri:String){
         val pair = WalletConnect.Params.Pair(uri.trim())
         WalletConnectClient.pair(pair, StreamPair)
+        result.success("paired")
     }
 
     private fun delegate(){
         val walletDelegate = object : WalletConnectClient.WalletDelegate {
             override fun onSessionProposal(sessionProposal: WalletConnect.Model.SessionProposal) {
-                sProposal = sessionProposal
+                currentProposal = sessionProposal
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
-                    "T" to "onSessionProposal",
+                    "T" to "sessionProposal",
                     "value" to mapOf(
-                        "accounts" to sProposal.accounts,
-                        "chains" to sProposal.chains,
-                        "description" to sProposal.description,
-                        "icons" to sProposal.icons,
-                        "isController" to sProposal.isController,
-                        "methods" to sProposal.methods,
-                        "name" to sProposal.name,
-                        "proposerPublicKey" to sProposal.proposerPublicKey,
-                        "relayProtocol" to sProposal.relayProtocol,
-                        "topic" to sProposal.topic,
-                        "ttl" to sProposal.ttl,
-                        "types" to sProposal.types,
-                        "url" to sProposal.url,
-                    )
+                        "accounts" to currentProposal.accounts,
+                        "chains" to currentProposal.chains,
+                        "description" to currentProposal.description,
+                        "icons" to currentProposal.icons,
+                        "isController" to currentProposal.isController.toString(),
+                        "methods" to currentProposal.methods,
+                        "name" to currentProposal.name,
+                        "proposerPublicKey" to currentProposal.proposerPublicKey,
+                        "relayProtocol" to currentProposal.relayProtocol,
+                        "topic" to currentProposal.topic,
+                        "ttl" to currentProposal.ttl.toString(),
+                        "types" to currentProposal.types,
+                        "url" to currentProposal.url,
+
+                        )
                 ))
             }
 
             override fun onSessionRequest(sessionRequest: WalletConnect.Model.SessionRequest) {
-                sRequest = sessionRequest
+                currentRequest = sessionRequest
                 // T for Response Type
+                val listParams = currentRequest.request.params.removePrefix("[").removeSuffix ("]").split(", ")
+
                 StreamDelegate.setValue(mapOf(
-                    "T" to "onSessionRequest",
+                    "T" to "sessionRequest",
                     "value" to mapOf(
-                        "chainId" to sRequest.chainId,
+                        "chainId" to currentRequest.chainId,
                         "request" to mapOf<String, Any?>(
-                            "method" to sRequest.request.method,
-                            "id" to sRequest.request.id,
-                            "params" to sRequest.request.params,
+                            "method" to currentRequest.request.method,
+                            "id" to currentRequest.request.id,
+                            "params" to JSONArray(currentRequest.request.params),
                         ),
-                        "topic" to sRequest.topic,
+                        "topic" to currentRequest.topic,
                     )
+
                 ))
             }
 
@@ -152,7 +276,7 @@ class MainActivity: FlutterActivity() {
                 dSession = deletedSession
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
-                    "T" to "onSessionDelete",
+                    "T" to "delete",
                     "value" to mapOf(
                         "reason" to dSession.reason,
                         "topic" to dSession.topic,
@@ -164,7 +288,7 @@ class MainActivity: FlutterActivity() {
                 sNotification = sessionNotification
                 // T for Response Type
                 StreamDelegate.setValue(mapOf(
-                    "T" to "onSessionNotification",
+                    "T" to "notification",
                     "value" to mapOf(
                         "data" to sNotification.data,
                         "topic" to sNotification.topic,
@@ -176,88 +300,91 @@ class MainActivity: FlutterActivity() {
         WalletConnectClient.setWalletDelegate(walletDelegate)
     }
 
-    private fun disconnect() {
-        val disconnect = WalletConnect.Params.Disconnect(
-            sessionTopic = sSession.topic,
-            reason = "User disconnects",
-            reasonCode = 1000
-        )
-
-        WalletConnectClient.disconnect(disconnect, StreamDisconnect)
-    }
-
-    // accounts is List<String> of chainId:address
-    // example :
-    // ["eip155:1:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716"]
-    private fun approve(accounts:List<String>){
+    /// method channel
+    private fun approve(account:String){
         // Session Proposal object sent by Dapp after pairing was successful
-        // val accounts = sProposal.chains.map { chainId -> "$chainId:0x022c0c42a80bd19EA4cF0F94c4F9F96645759716" }
-        val approve = WalletConnect.Params.Approve(sProposal, accounts)
-
+        val accounts = currentProposal.chains.map { chainId -> "$chainId:$account" }
+        val approve = WalletConnect.Params.Approve(currentProposal, accounts)
         WalletConnectClient.approve(approve, StreamApprove)
     }
 
+    /// method channel
     private fun reject() {
-        val rejectionReason = "Reject Session"
-        val proposalTopic: String = sProposal.topic
+        val rejectionReason = "User rejected the session."
+        val proposalTopic: String = currentProposal.topic
         val reject = WalletConnect.Params.Reject(rejectionReason, proposalTopic)
 
         WalletConnectClient.reject(reject, StreamReject)
     }
 
+    /// method channel
+    private fun disconnect(topic: String) {
+        val disconnect = WalletConnect.Params.Disconnect(
+            sessionTopic = topic,
+            reason = "User disconnect the session.",
+            reasonCode = 0
+        )
+
+        WalletConnectClient.disconnect(disconnect, StreamDisconnect)
+    }
+
+    /// method channel
     private fun respondRequest(sign:String){
         val response = WalletConnect.Params.Response(
-            sessionTopic = sRequest.topic,
+            sessionTopic = currentRequest.topic,
             jsonRpcResponse = WalletConnect.Model.JsonRpcResponse.JsonRpcResult(
-                sRequest.request.id,
+                currentRequest.request.id,
                 sign
             )
         )
         WalletConnectClient.respond(response, StreamRespondRequest)
     }
 
+    /// method channel
     private fun rejectRequest() {
         val response = WalletConnect.Params.Response(
-            sessionTopic = sRequest.topic,
+            sessionTopic = currentRequest.topic,
             jsonRpcResponse = WalletConnect.Model.JsonRpcResponse.JsonRpcError(
-                sRequest.request.id,
-                WalletConnect.Model.JsonRpcResponse.Error(500, "Reject Request")
+                currentRequest.request.id,
+                WalletConnect.Model.JsonRpcResponse.Error(0, "User rejected the request.")
             )
         )
 
         WalletConnectClient.respond(response, StreamRejectRequest)
     }
 
-    private fun sessionUpdate(accounts:List<String>) {
+    /// event channel
+    private fun ping(result: MethodChannel.Result, topic: String) {
+        val ping = WalletConnect.Params.Ping(topic)
+
+        WalletConnectClient.ping(ping, StreamSessionPing)
+    }
+
+    /// method channel
+    private fun update(chains: List<String>, topic: String, account:String) {
+        val accounts = chains.map { chainId -> "$chainId:$account" }
         val update = WalletConnect.Params.Update(
-            sessionTopic = sSession.topic,
-            // sessionState = WalletConnect.Model.SessionState(accounts = listOf("${sProposal.chains[0]}:0xa0A6c118b1B25207A8A764E1CAe1635339bedE62"))
+            sessionTopic = topic,
             sessionState = WalletConnect.Model.SessionState(accounts = accounts)
         )
 
         WalletConnectClient.update(update, StreamSessionUpdate)
     }
 
-    private fun sessionUpgrade(chains:List<String>, jsonrpc : List<String>) {
+    /// method channel
+    private fun upgrade(chains: List<String>, methods: List<String>, notifications: List<String>,  topic: String ) {
         val permissions =
             WalletConnect.Model.SessionPermissions(
-                // blockchain = WalletConnect.Model.Blockchain(chains = listOf("eip155:80001")),
-                // jsonRpc = WalletConnect.Model.Jsonrpc(listOf("eth_sign"))
                 blockchain = WalletConnect.Model.Blockchain(chains = chains),
-                jsonRpc = WalletConnect.Model.Jsonrpc(jsonrpc)
+                jsonRpc = WalletConnect.Model.Jsonrpc(methods),
+                notification = WalletConnect.Model.Notifications(notifications),
             )
-        val upgrade = WalletConnect.Params.Upgrade(topic = sSession.topic, permissions = permissions)
+        val upgrade = WalletConnect.Params.Upgrade(topic = topic, permissions = permissions)
 
         WalletConnectClient.upgrade(upgrade, StreamSessionUpgrade)
     }
 
-    private fun sessionPing(result: MethodChannel.Result) {
-        val ping = WalletConnect.Params.Ping(sSession.topic)
-
-        WalletConnectClient.ping(ping, StreamSessionPing)
-    }
 }
-
 
 
 object StreamDelegate : EventChannel.StreamHandler, DelegateValue {
@@ -280,6 +407,7 @@ object StreamDelegate : EventChannel.StreamHandler, DelegateValue {
         res = resVal
         handler = Handler(Looper.getMainLooper())
         handler!!.post {
+            println("value delegate")
             sink?.success(
                 JSONObject(res).toString()
             )
@@ -308,6 +436,7 @@ object StreamPair : EventChannel.StreamHandler, WalletConnect.Listeners.Pairing 
         handler!!.post {
             println("=================== pair")
             if(settledPairing.metaData!= null){
+                println("=================== 1")
                 sink?.success(resultOnSuccess(
                     mapOf(
                         "metaData" to mapOf(
@@ -317,14 +446,15 @@ object StreamPair : EventChannel.StreamHandler, WalletConnect.Listeners.Pairing 
                             "url" to sPairing.metaData!!.url,
                         ),
                         "topic" to sPairing.topic,
-                    )
+                        )
                 ))
             } else {
+                println("=================== 2")
                 sink?.success(resultOnSuccess(
                     mapOf(
                         "metaData" to sPairing.metaData,
                         "topic" to sPairing.topic,
-                    )
+                        )
                 ))
             }
         }
@@ -356,12 +486,17 @@ object StreamDisconnect : EventChannel.StreamHandler, WalletConnect.Listeners.Se
         handler = Handler(Looper.getMainLooper())
         handler!!.post {
             println("=================== disconnect")
-            sink?.success(resultOnSuccess(
-                mapOf(
-                    "reason" to dSession.reason,
-                    "topic" to dSession.topic,
-                )
-            ))
+            sink?.success(
+                JSONObject(
+                    mapOf(
+                        "T" to "delete",
+                        "value" to mapOf(
+                            "reason" to dSession.reason,
+                            "topic" to dSession.topic,
+                        )
+                    )
+                ).toString()
+            )
         }
     }
 
@@ -392,24 +527,7 @@ object StreamApprove : EventChannel.StreamHandler, WalletConnect.Listeners.Sessi
         handler = Handler(Looper.getMainLooper())
         handler!!.post {
             sink?.success(
-                resultOnSuccess(
-                    mapOf(
-                        "accounts" to sSession.accounts,
-                        "peerAppMetaData" to sSession.peerAppMetaData,
-                        "permissions" to mapOf(
-                            "blockchain" to mapOf(
-                                "chains" to sSession.permissions.blockchain.chains,
-                            ),
-                            "jsonRpc" to mapOf(
-                                "methods" to sSession.permissions.jsonRpc.methods
-                            ),
-                            "notifications" to mapOf(
-                                "types" to sSession.permissions.notifications.types
-                            ),
-                        ),
-                        "topic" to sSession.topic,
-                    )
-                )
+                  sessionResponse(T = sSession.topic, session = settledSession)
             )
         }
 

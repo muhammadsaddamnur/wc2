@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:wallet_connect_v2_flutter/ios_example.dart';
 import 'package:wallet_connect_v2_flutter/method_channel_impl.dart';
-import 'package:wallet_connect_v2_flutter/method_channel_ios.dart';
+import 'package:wallet_connect_v2_flutter/backup/method_channel_ios.dart';
 
 void main() {
   runApp(const MyApp());

@@ -35,11 +35,27 @@ class WCEthereumTransaction {
       WCEthereumTransaction(
         from: json["from"],
         data: json["data"],
-        gasLimit: json["gasLimit"],
-        value: json["value"],
-        gasPrice: json["gasPrice"],
+        gasLimit: json["gasLimit"] == null
+            ? null
+            : (json["gasLimit"] is String == true
+                ? json["gasLimit"]
+                : json["gasLimit"].toString()),
+        value: json["value"] == null
+            ? null
+            : (json["value"] is String == true
+                ? json["value"]
+                : json["value"].toString()),
+        gasPrice: json["gasPrice"] == null
+            ? null
+            : (json["gasPrice"] is String == true
+                ? json["gasPrice"]
+                : json["gasPrice"].toString()),
         to: json["to"],
-        nonce: json["nonce"],
+        nonce: json["nonce"] == null
+            ? null
+            : (json["nonce"] is String == true
+                ? json["nonce"]
+                : json["nonce"].toString()),
       );
 
   Map<String, dynamic> toJson() => {

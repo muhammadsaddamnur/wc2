@@ -39,7 +39,11 @@ class Value {
 
   factory Value.fromJson(Map<String, dynamic> json) => Value(
         topic: json["topic"],
-        reason: json["reason"] == null ? null : Reason.fromJson(json["reason"]),
+        reason: json["reason"] == null
+            ? null
+            : json["reason"] is String
+                ? Reason(code: '0', message: json["reason"])
+                : Reason.fromJson(json["reason"]),
       );
 
   Map<String, dynamic> toJson() => {

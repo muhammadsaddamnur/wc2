@@ -37,6 +37,7 @@ dependencies:
   web3dart: ^2.3.5
   http: ^0.13.4
   eth_sig_util: ^0.0.7
+  async: ^2.8.2
 
 dev_dependencies:
   flutter_test:

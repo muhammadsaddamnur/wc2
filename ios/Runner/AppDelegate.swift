@@ -224,7 +224,7 @@ import WalletConnectUtils
         } catch {
             result("update error")
         }
-        result("update")
+        result("updated")
     }
     
     /// method channel
@@ -235,7 +235,7 @@ import WalletConnectUtils
         } catch {
             result("upgrade error")
         }
-        result("upgrade")
+        result("upgraded")
     }
     
     /// helper
@@ -280,7 +280,6 @@ import WalletConnectUtils
     /// event channel
     func didSettle(session: Session) {
         self.eventSink!(sessionResponse(T: "settle", session: session))
-
     }
     
     
